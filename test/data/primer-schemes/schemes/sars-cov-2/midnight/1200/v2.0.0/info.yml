@@ -1,8 +1,8 @@
-schema_version: 1.0.0-alpha
+schema_version: 1.0.0a
+organism: sars-cov-2
 name: midnight
 amplicon_size: 1200
-version: v2
-organism: sars-cov-2
+version: v2.0.0
 aliases:
 - midnight-ont-v2
 - midnight-idt-v1

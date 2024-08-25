@@ -47,7 +47,6 @@ classes:
         required: true
       home_page:
         description: "A link to the home page of the vendor"
-        required: true
       kit_name:
         slot_uri: GENEPIO:0100693
         description: "Vendor specific kit name for primer kit"
