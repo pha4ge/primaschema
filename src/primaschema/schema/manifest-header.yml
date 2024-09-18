@@ -1,0 +1,17 @@
+schema_version: "1.0.0-alpha"
+metadata: The manifest of PHA4GE tiled amplicon PCR primer scheme definitions
+repository: https://github.com/pha4ge/primer-schemes
+license: CC-BY-4.0
+organisms:
+- organism: sars-cov-2
+  display_name: SARS-CoV-2
+  aliases:
+  - nCoV-2019
+- organism: mpxv
+  display_name: MPXV
+  aliases:
+  - Monkeypox virus
+- organism: niv
+  display_name: NiV
+  aliases:
+  - Nipah virus

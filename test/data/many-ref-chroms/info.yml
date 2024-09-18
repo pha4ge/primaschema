@@ -1,0 +1,11 @@
+schema_version: 1.0.0a
+organism: sars-cov-2
+name: artic
+amplicon_size: 400
+version: v1.0.0
+developers:
+- test
+definition_url: https://github.com/pha4ge/primer-schemes/tree/main/sars-cov-2/artic/v4.1
+license: CC-BY-SA-4.0
+primer_checksum: primaschema:bf27195bc23ec05e
+reference_checksum: primaschema:1b97591d2f6ab46e

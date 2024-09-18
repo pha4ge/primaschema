@@ -1,0 +1,20 @@
+schema_version: 1.0.0-alpha
+name: eden
+amplicon_size: 2500
+version: v1
+organism: sars-cov-2
+aliases:
+- sydney
+developers:
+- John-Sebastian Eden
+- Eby Sim
+definition_url: https://github.com/pha4ge/primer-schemes/tree/main/sars-cov-2/eden/v1
+citations:
+- https://www.protocols.io/view/sars-cov-2-genome-sequencing-using-long-pooled-amp-kxygxeob4v8j/v1
+notes:
+- Protocol includes addendum for ONT sequencing
+license: CC-BY-4.0
+citations:
+  - https://dx.doi.org/10.17504/protocols.io.befyjbpw
+primer_checksum: primaschema:55c9726eb1400cab
+reference_checksum: primaschema:b1acd7163146bf17

@@ -1,0 +1,8 @@
+NC_038235.1 type_a	0	21	scheme-a_1_LEFT_0	1	+
+NC_038235.1 type_a	1213	1233	scheme-a_1_RIGHT_0	1	-
+NC_038235.1 type_a	1123	1144	scheme-a_2_LEFT_0	2	+
+NC_038235.1 type_a	2123	2143	scheme-a_2_RIGHT_0	2	-
+NC_001781.1 type_b	0	21	scheme-b_1_LEFT_0	1	+
+NC_001781.1 type_b	1213	1233	scheme-b_1_RIGHT_0	1	-
+NC_001781.1 type_b	1123	1144	scheme-b_2_LEFT_0	2	+
+NC_001781.1 type_b	2123	2143	scheme-b_2_RIGHT_0	2	-
