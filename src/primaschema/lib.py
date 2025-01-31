@@ -170,6 +170,38 @@ def convert_scheme_bed_to_primer_bed(bed_path: Path, fasta_path: Path) -> str:
     return df.to_csv(sep="\t", header=False, index=False)
 
 
+def convert_vwf_to_primer_bed(vwf_path: Path, chrom: str = "chrom") -> str:
+    vwf_df = pd.read_csv(vwf_path, sep="\t")
+    bed_records = []
+    pool_counter = {}
+
+    for r in vwf_df.to_records("dict"):
+        amplicon_name = r["Amplicon_name"]
+        primer_name = r["Primer_name"]
+        orientation = r["Left_or_right"]
+        amplicon_number = int(amplicon_name.split("_")[-1])
+        pool_name = 1 if amplicon_number % 2 != 0 else 2
+        if amplicon_name not in pool_counter:
+            pool_counter[amplicon_name] = 1
+        else:
+            pool_counter[amplicon_name] += 1
+        strand = "+" if orientation == "left" else "-"
+        sequence = r["Sequence"]
+        start_pos = r["Position"]
+        bed_record = {}
+        bed_record["chrom"] = chrom
+        bed_record["chromStart"] = start_pos
+        bed_record["chromEnd"] = start_pos + len(sequence)
+        bed_record["name"] = primer_name
+        bed_record["poolName"] = str(pool_name)
+        bed_record["strand"] = strand
+        bed_record["sequence"] = sequence
+        bed_records.append(bed_record)
+
+    bed_df = pd.DataFrame(bed_records)
+    return bed_df.to_csv(sep="\t", header=False, index=False)
+
+
 def hash_bed(bed_path: Path) -> str:
     bed_type = infer_bed_type(bed_path)
     if bed_type == "primer":

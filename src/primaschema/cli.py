@@ -137,6 +137,17 @@ def six_to_seven(bed_path: Path, fasta_path: Path):
     print(bed_str)
 
 
+def vwf_to_bed(vwf_path: Path, chrom: str = "chrom"):
+    """
+    Convert a Viridian VWF scheme TSV to a 7 column primer.bed
+
+    :arg vwf_path: path of scheme.bed file
+    :arg chrom: name of reference chromosome
+    """
+    bed_str = lib.convert_vwf_to_primer_bed(vwf_path=vwf_path, chrom=chrom)
+    print(bed_str)
+
+
 def diff(bed1_path: Path, bed2_path: Path, only_positions: bool = False):
     """
     Show the symmetric difference of records in two bed files
@@ -215,6 +226,7 @@ def main():
             "diff": diff,
             "6to7": six_to_seven,
             "7to6": seven_to_six,
+            "vwftobed": vwf_to_bed,
             "plot": plot,
             "show-intervals": amplicon_intervals,
             "show-discordant-primers": discordant_primers,
