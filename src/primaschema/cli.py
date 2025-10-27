@@ -205,6 +205,18 @@ def synchronise():
     lib.synchronise()
 
 
+def dump(info_path: Path, debug: bool = False):
+    """
+    Read and validate an info.yaml file, then output it as JSON
+
+    :arg info_path: path of info.yaml file
+    :arg debug: show debug messages
+    """
+    configure_logging(debug)
+    json_str = lib.dump(info_path=info_path)
+    print(json_str)
+
+
 def plot(bed_path: Path, out_path: Path = Path("primer.html")):
     """
     Plot amplicon and primer coords from 7 column primer.bed
@@ -232,6 +244,7 @@ def main():
             "show-discordant-primers": discordant_primers,
             "subset": subset,
             "sync": synchronise,
+            "dump": dump,
         },
         no_negated_flags=True,
         strict_kwonly=False,
