@@ -22,6 +22,7 @@ classes:
       - schema_version
       - name
       - amplicon_size
+      - contributors
       - version
       - organism
       - source_url
@@ -50,6 +51,22 @@ classes:
       kit_name:
         slot_uri: GENEPIO:0100693
         description: "Vendor specific kit name for primer kit"
+
+  Contributor:
+    class_uri: IAO:contributor
+    description: "Person or organisation who contributed to primerscheme development"
+    attributes:
+      name:
+        slot_uri: IAO:0000590 # A textual entity that denotes a particular in reality.
+        description: "The name of the person or organisation"
+        required: true
+      orcid:
+        slot_uri: IAO:0000708
+        description: "ORCID ('Open Researcher and Contributor IDentifier') of a person"
+      email:
+        slot_uri: IAO:0000429
+        description: "Contact email"
+        pattern: "^[\\w\\-\\.]+@([\\w-]+\\.)+[\\w-]{2,}$"
 
   Mask:
     description: "A region to mask out, with zero-based, half open coordinates"
@@ -83,9 +100,12 @@ slots:
     pattern: "^[\\da-z0-9_.-]+$"
   version:
     required: true
-    pattern: "^[\\da-z0-9_.-]+$"
-  display_name:
-    description: The human-friendly display name of the primer scheme
+    pattern: "^v\\d+\\.\\d+\\.\\d+(-[a-z0-9]+)?$"
+  contributors:
+    required: true
+    multivalued: true
+    inlined_as_list: true
+    range: Contributor
   organism:
     slot_uri: GENEPIO:0100682
     required: true

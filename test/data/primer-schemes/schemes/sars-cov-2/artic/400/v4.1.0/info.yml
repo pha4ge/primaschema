@@ -7,7 +7,13 @@ derived_from: sars-cov-2/artic/400/v4.0.0
 aliases:
 - ARTIC/V4.1
 developers:
-- ARTIC network
+  - ARTIC network
+contributors:
+  - name: "Chris"
+    email: "chrisgkent@test.com"
+    orcid: "123"
+  - name: "Bede"
+    email: "Bede@test.com"
 vendors:
 - organisation_name: IDT
   kit_name: '10011442'
