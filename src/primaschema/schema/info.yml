@@ -7,7 +7,7 @@ prefixes:
   schema: http://schema.org/
   ORCID: http://identifiers.org/orcid/
   GENEPIO: http://purl.obolibrary.org/obo/GENEPIO_
-  IAO: "https://bioregistry.io/reference/iao:"
+  IAO: "http://purl.obolibrary.org/obo/IAO_"
 default_curi_maps:
   - semweb_context
 imports:
@@ -162,15 +162,6 @@ slots:
   derived_from:
     slot_uri: GENEPIO:0100671
     description: "Canonical name of the primer scheme from which this scheme was derived"
-  person_name:
-    slot_uri: schema:name
-    required: true
-    description: "The name of a natural person"
-  orcid:
-    description: "ORCID ('Open Researcher and Contributor IDentifier') of a person"
-  organisation_name:
-    required: true
-    description: "The name of an organisation"
   home_page:
     description: "A link to the home page of an organisation"
   masks:
