@@ -126,7 +126,7 @@ slots:
     slot_uri: GENEPIO:0100681
     description: "The status of this primer scheme (e.g. published, deprecated)"
     range: SchemeStatus
-    ifabsent: string(PUBLISHED)
+    required: true
   license:
     description: "License under which the primer scheme is distributed"
   citations:
