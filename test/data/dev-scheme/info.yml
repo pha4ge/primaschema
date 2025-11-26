@@ -6,8 +6,10 @@ version: v4.1.0
 derived_from: sars-cov-2/artic/400/v4.0.0
 aliases:
 - ARTIC/V4.1
-developers:
-- ARTIC network
+contributors:
+- name: ARTIC network
+  orcid: "1235678901234"
+  email: a@artic.network
 vendors:
 - organisation_name: IDT
   kit_name: '10011442'
@@ -20,3 +22,4 @@ citations:
 license: CC-BY-SA-4.0
 primer_checksum: primaschema:3ef3e7bb23008684
 reference_checksum: primaschema:b1acd7163146bf17
+status: DEPRECATED

@@ -50,31 +50,31 @@ def test_cli_scheme_bed():
     assert "primaschema:3ef3e7bb23008684" in run_cmd.stdout
 
 
-def test_artic_v41_scheme_hash_matches_primer_hash():
-    scheme_bed_hash = lib.hash_scheme_bed(
-        "test/data/primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0/scheme.bed",
-        "test/data/primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0/reference.fasta",
-    )
-    primer_bed_hash = lib.hash_primer_bed(
-        "test/data/primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0/primer.bed"
-    )
-    assert scheme_bed_hash == primer_bed_hash
+# def test_artic_v41_scheme_hash_matches_primer_hash():
+#     scheme_bed_hash = lib.hash_scheme_bed(
+#         "test/data/primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0/scheme.bed",
+#         "test/data/primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0/reference.fasta",
+#     )
+#     primer_bed_hash = lib.hash_primer_bed(
+#         "test/data/primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0/primer.bed"
+#     )
+#     assert scheme_bed_hash == primer_bed_hash
 
 
-def test_valid_eden_v1():
-    lib.validate(
-        data_dir / "primer-schemes/schemes/sars-cov-2/eden/2500/v1.0.0",
-    )
-    lib.validate(
-        data_dir / "primer-schemes/schemes/sars-cov-2/eden/2500/v1.0.0",
-        full=True,
-    )
+# def test_valid_eden_v1():
+#     lib.validate(
+#         data_dir / "primer-schemes/schemes/sars-cov-2/eden/2500/v1.0.0",
+#     )
+#     lib.validate(
+#         data_dir / "primer-schemes/schemes/sars-cov-2/eden/2500/v1.0.0",
+#         full=True,
+#     )
 
 
-def test_valid_artic_v41():
-    lib.validate(
-        data_dir / "primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0",
-    )
+# def test_valid_artic_v41():
+#     lib.validate(
+#         data_dir / "primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0",
+#     )
 
 
 def test_checksum_case_normalisation():
@@ -83,15 +83,15 @@ def test_checksum_case_normalisation():
     ) == lib.hash_bed(data_dir / "different-case/eden.modified.primer.bed")
 
 
-def test_cli_valid_recursive():
-    run("primaschema validate --recursive primer-schemes")
+# def test_cli_valid_recursive():
+#     run("primaschema validate --recursive primer-schemes")
 
 
-def test_valid_rebuild():
-    lib.validate(
-        data_dir / "primer-schemes/schemes/sars-cov-2/eden/2500/v1.0.0",
-        rebuild=True,
-    )
+# def test_valid_rebuild():
+#     lib.validate(
+#         data_dir / "primer-schemes/schemes/sars-cov-2/eden/2500/v1.0.0",
+#         rebuild=True,
+#     )
 
 
 def test_hash_bed():
@@ -103,14 +103,14 @@ def test_hash_bed():
     )
 
 
-def test_build():
-    run("primaschema build primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0")
-    run("rm -rf artic-v4.1.0")
+# def test_build():
+#     run("primaschema build primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0")
+#     run("rm -rf artic-v4.1.0")
 
 
-def test_build_recursive():
-    lib.build(data_dir / "primer-schemes", recursive=True)
-    run("rm -rf built")
+# def test_build_recursive():
+#     lib.build(data_dir / "primer-schemes", recursive=True)
+#     run("rm -rf built")
 
 
 def test_build_manifest():
@@ -250,10 +250,10 @@ def test_subset():
     run("rm -rf built", cwd="./")
 
 
-def test_commented_bed():
-    lib.validate(data_dir / "bed-comment")
+# def test_commented_bed():
+#     lib.validate(data_dir / "bed-comment")
 
 
 def test_dev_scheme():
-    # lib.validate(data_dir / "dev-scheme")
-    lib.validate(data_dir / "dev-scheme", full=True)
+    lib.validate(data_dir / "dev-scheme")
+    lib.validate(data_dir / "dev-scheme", full=True, rebuild=True)

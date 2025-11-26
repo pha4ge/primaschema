@@ -31,7 +31,6 @@ classes:
       - license
       - status
       - derived_from
-      - developers
       - citations
       - notes
       - vendors
@@ -115,11 +114,6 @@ slots:
     description: Aliases for primer scheme name
     multivalued: true
     inlined_as_list: true
-  developers:
-    slot_uri: GENEPIO:0100673
-    description: Persons or organisations responsible for developing the primer scheme
-    required: true
-    multivalued: true
   vendors:
     description: "Vendors where one can purchase the primers described in the amplicon scheme or a kit containing these primers"
     multivalued: true
@@ -174,6 +168,8 @@ enums:
   SchemeStatus:
     description: "Status of this amplicon primer scheme"
     permissible_values:
-      PUBLISHED:
-      DEPRECATED:
       DRAFT:
+      TESTED:
+      VALIDATED:
+      DEPRECATED:
+      WITHDRAWN:

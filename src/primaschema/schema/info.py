@@ -56,7 +56,7 @@ linkml_meta = LinkMLMeta(
             },
             "IAO": {
                 "prefix_prefix": "IAO",
-                "prefix_reference": "https://bioregistry.io/reference/iao:",
+                "prefix_reference": "http://purl.obolibrary.org/obo/IAO_",
             },
             "ORCID": {
                 "prefix_prefix": "ORCID",
@@ -81,9 +81,11 @@ class SchemeStatus(str, Enum):
     Status of this amplicon primer scheme
     """
 
-    PUBLISHED = "PUBLISHED"
-    DEPRECATED = "DEPRECATED"
     DRAFT = "DRAFT"
+    TESTED = "TESTED"
+    VALIDATED = "VALIDATED"
+    DEPRECATED = "DEPRECATED"
+    WITHDRAWN = "WITHDRAWN"
 
 
 class PrimerScheme(ConfiguredBaseModel):
@@ -111,7 +113,7 @@ class PrimerScheme(ConfiguredBaseModel):
         json_schema_extra={
             "linkml_meta": {
                 "alias": "name",
-                "domain_of": ["PrimerScheme", "Mask"],
+                "domain_of": ["PrimerScheme", "Contributor", "Mask"],
                 "slot_uri": "GENEPIO:0001456",
             }
         },
@@ -126,6 +128,12 @@ class PrimerScheme(ConfiguredBaseModel):
                 "domain_of": ["PrimerScheme"],
                 "slot_uri": "GENEPIO:0001449",
             }
+        },
+    )
+    contributors: list[Contributor] = Field(
+        default=...,
+        json_schema_extra={
+            "linkml_meta": {"alias": "contributors", "domain_of": ["PrimerScheme"]}
         },
     )
     version: str = Field(
@@ -181,14 +189,13 @@ class PrimerScheme(ConfiguredBaseModel):
             "linkml_meta": {"alias": "license", "domain_of": ["PrimerScheme"]}
         },
     )
-    status: Optional[SchemeStatus] = Field(
-        default="PUBLISHED",
+    status: SchemeStatus = Field(
+        default=...,
         description="""The status of this primer scheme (e.g. published, deprecated)""",
         json_schema_extra={
             "linkml_meta": {
                 "alias": "status",
                 "domain_of": ["PrimerScheme"],
-                "ifabsent": "string(PUBLISHED)",
                 "slot_uri": "GENEPIO:0100681",
             }
         },
@@ -201,17 +208,6 @@ class PrimerScheme(ConfiguredBaseModel):
                 "alias": "derived_from",
                 "domain_of": ["PrimerScheme"],
                 "slot_uri": "GENEPIO:0100671",
-            }
-        },
-    )
-    developers: list[str] = Field(
-        default=...,
-        description="""Persons or organisations responsible for developing the primer scheme""",
-        json_schema_extra={
-            "linkml_meta": {
-                "alias": "developers",
-                "domain_of": ["PrimerScheme"],
-                "slot_uri": "GENEPIO:0100673",
             }
         },
     )
@@ -288,7 +284,7 @@ class PrimerScheme(ConfiguredBaseModel):
 
     @field_validator("version")
     def pattern_version(cls, v):
-        pattern = re.compile(r"^[\da-z0-9_.-]+$")
+        pattern = re.compile(r"^v\d+\.\d+\.\d+(-[a-z0-9]+)?$")
         if isinstance(v, list):
             for element in v:
                 if isinstance(element, str) and not pattern.match(element):
@@ -339,6 +335,66 @@ class Vendor(ConfiguredBaseModel):
     )
 
 
+class Contributor(ConfiguredBaseModel):
+    """
+    Person or organisation who contributed to primerscheme development
+    """
+
+    linkml_meta: ClassVar[LinkMLMeta] = LinkMLMeta(
+        {
+            "class_uri": "IAO:contributor",
+            "from_schema": "https://github.com/pha4ge/primer-schemes/schemas/primer-scheme",
+        }
+    )
+
+    name: str = Field(
+        default=...,
+        description="""The name of the person or organisation""",
+        json_schema_extra={
+            "linkml_meta": {
+                "alias": "name",
+                "domain_of": ["PrimerScheme", "Contributor", "Mask"],
+                "slot_uri": "IAO:0000590",
+            }
+        },
+    )
+    orcid: Optional[str] = Field(
+        default=None,
+        description="""ORCID ('Open Researcher and Contributor IDentifier') of a person""",
+        json_schema_extra={
+            "linkml_meta": {
+                "alias": "orcid",
+                "domain_of": ["Contributor"],
+                "slot_uri": "IAO:0000708",
+            }
+        },
+    )
+    email: Optional[str] = Field(
+        default=None,
+        description="""Contact email""",
+        json_schema_extra={
+            "linkml_meta": {
+                "alias": "email",
+                "domain_of": ["Contributor"],
+                "slot_uri": "IAO:0000429",
+            }
+        },
+    )
+
+    @field_validator("email")
+    def pattern_email(cls, v):
+        pattern = re.compile(r"^[\w\-\.]+@([\w-]+\.)+[\w-]{2,}$")
+        if isinstance(v, list):
+            for element in v:
+                if isinstance(element, str) and not pattern.match(element):
+                    err_msg = f"Invalid email format: {element}"
+                    raise ValueError(err_msg)
+        elif isinstance(v, str) and not pattern.match(v):
+            err_msg = f"Invalid email format: {v}"
+            raise ValueError(err_msg)
+        return v
+
+
 class Mask(ConfiguredBaseModel):
     """
     A region to mask out, with zero-based, half open coordinates
@@ -361,7 +417,10 @@ class Mask(ConfiguredBaseModel):
         default=...,
         description="""Name of the region""",
         json_schema_extra={
-            "linkml_meta": {"alias": "name", "domain_of": ["PrimerScheme", "Mask"]}
+            "linkml_meta": {
+                "alias": "name",
+                "domain_of": ["PrimerScheme", "Contributor", "Mask"],
+            }
         },
     )
     start: int = Field(
@@ -382,4 +441,5 @@ class Mask(ConfiguredBaseModel):
 # see https://pydantic-docs.helpmanual.io/usage/models/#rebuilding-a-model
 PrimerScheme.model_rebuild()
 Vendor.model_rebuild()
+Contributor.model_rebuild()
 Mask.model_rebuild()

@@ -2,10 +2,11 @@
 
 # Primaschema
 
-**🚨 Migration to v1 scheme specification in progress**
+## Dev notes
+
+`pytest -v test/test_all.py::test_dev_scheme`
 
 A toolkit for fetching, validating and interrogating tiled amplicon PCR primer scheme definitions. Provides convenient programmatic accesss to the [PHA4GE primer-schemes repository](https://github.com/pha4ge/primer-schemes), a community repository of tiled amplicons primer schemes.
-
 
 ## Install (Python 3.8+)
 
