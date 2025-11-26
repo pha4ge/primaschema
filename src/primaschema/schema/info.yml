@@ -28,6 +28,7 @@ classes:
       - aliases
       - license
       - status
+      - labels
       - derived_from
       - citations
       - notes
@@ -151,3 +152,8 @@ enums:
     description: "License under which the primer scheme is distributed"
     permissible_values:
       CC-BY-SA-4.0:
+  SchemeLabel:
+    description: "Label for this primer scheme"
+    permissible_values:
+      WASTEWATER:
+      CLINICAL:
