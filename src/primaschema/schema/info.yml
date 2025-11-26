@@ -22,11 +22,9 @@ classes:
       - schema_version
       - name
       - amplicon_size
-      - contributors
       - version
+      - contributors
       - organism
-      - source_url
-      - definition_url
       - aliases
       - license
       - status
@@ -34,9 +32,10 @@ classes:
       - citations
       - notes
       - vendors
-      - masks
       - primer_checksum
+      - primer_file_sha256
       - reference_checksum
+      - reference_file_sha256
 
   Vendor:
     class_uri: GENEPIO:0100674
@@ -66,26 +65,6 @@ classes:
         slot_uri: IAO:0000429
         description: "Contact email"
         pattern: "^[\\w\\-\\.]+@([\\w-]+\\.)+[\\w-]{2,}$"
-
-  Mask:
-    description: "A region to mask out, with zero-based, half open coordinates"
-    attributes:
-      reference:
-        description: "Name (ID) of the reference sequence"
-        required: true
-      name:
-        description: "Name of the region"
-        required: true
-      start:
-        description: "Start coordinate of the region"
-        range: integer
-        minimum_value: 1
-        required: true
-      end:
-        description: "End coordination of the region"
-        range: integer
-        minimum_value: 1
-        required: true
 
 slots:
   schema_version:
@@ -125,11 +104,6 @@ slots:
     range: integer
     required: true
     minimum_value: 1
-  definition_url:
-    slot_uri: GENEPIO:0100683
-    description: "GitHub URL of PHA4GE compatible primer scheme scheme definition"
-  source_url:
-    description: "Source URL of primer scheme BED file, if available, e.g. GitHub repository URL"
   notes:
     description: "Notes about the amplicon primer scheme"
     slot_uri: GENEPIO:0100672
@@ -142,7 +116,9 @@ slots:
     range: SchemeStatus
     required: true
   license:
+    range: SchemeLicense
     description: "License under which the primer scheme is distributed"
+    ifabsent: SchemeLicense(CC-BY-SA-4.0)
   citations:
     slot_uri: IAO:0000301
     description: "URLs of publications describing the scheme (DOIs preferred when available)"
@@ -151,18 +127,16 @@ slots:
   primer_checksum:
     slot_uri: GENEPIO:0100675
     description: "Checksum for the primer scheme BED file, in format checksum_type:checksum, where checksum_type is lowercase name of checksum generator e.g. primaschema"
+  primer_file_sha256:
+    description: "SHA256 checksum for the primer scheme BED file"
   reference_checksum:
     description: "Checksum for the reference FASTA file, in format checksum_type:checksum, where checksum_type is lowercase name of checksum generator e.g. primaschema"
+  reference_file_sha256:
+    description: "SHA256 checksum for the reference FASTA file"
   derived_from:
     slot_uri: GENEPIO:0100671
     description: "Canonical name of the primer scheme from which this scheme was derived"
-  home_page:
-    description: "A link to the home page of an organisation"
-  masks:
-    description: "Regions of the reference genome that should be masked out with N"
-    multivalued: true
-    inlined_as_list: true
-    range: Mask
+
 
 enums:
   SchemeStatus:
@@ -173,3 +147,7 @@ enums:
       VALIDATED:
       DEPRECATED:
       WITHDRAWN:
+  SchemeLicense:
+    description: "License under which the primer scheme is distributed"
+    permissible_values:
+      CC-BY-SA-4.0:
