@@ -29,7 +29,7 @@ dependencies = [
     "defopt==6.4.0",
     "httpx>=0.27.0",
     "jsonschema",
-    "linkml",
+    "linkml>=1.9.4",
     "natsort>=8.4.0",
     "pandas>=1.5.3",
     "platformdirs>=4.2.2",
@@ -55,3 +55,7 @@ dev = [
 [tool.flit.external-data]
 directory = "test"
 
+[tool.pytest.ini_options]
+filterwarnings = [
+    "ignore::pydantic.warnings.PydanticDeprecatedSince211:linkml.generators.*",
+]

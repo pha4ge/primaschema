@@ -250,6 +250,18 @@ def parse_scheme_yaml(path: Path) -> dict:
     return info.PrimerScheme(**data).model_dump()
 
 
+def dump(info_path: Path) -> str:
+    """
+    Read and validate an info.yaml file, then return it as JSON string
+
+    :param info_path: path to info.yaml or info.yml file
+    :return: JSON string representation of the validated scheme info
+    """
+    logger.debug(f"Reading and validating info file: {info_path}")
+    scheme_data = parse_scheme_yaml(info_path)
+    return json.dumps(scheme_data, indent=2)
+
+
 def validate_bed_and_ref(
     bed_path: Path, ref_path: Optional[Path] = None
 ) -> bed.BedModel:

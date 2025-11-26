@@ -1,13 +1,11 @@
 from __future__ import annotations
-from enum import Enum
-import re
-from typing import List, Optional
-from pydantic.version import VERSION as PYDANTIC_VERSION
 
-if int(PYDANTIC_VERSION[0]) >= 2:
-    from pydantic import BaseModel, ConfigDict, Field, field_validator
-else:
-    from pydantic import BaseModel, Field
+import re
+from enum import Enum
+from typing import Any, ClassVar, Optional
+
+from pydantic import BaseModel, ConfigDict, Field, RootModel, field_validator
+
 
 metamodel_version = "None"
 version = "1.0.0-alpha"
@@ -25,6 +23,59 @@ class ConfiguredBaseModel(BaseModel):
     pass
 
 
+class LinkMLMeta(RootModel):
+    root: dict[str, Any] = {}
+    model_config = ConfigDict(frozen=True)
+
+    def __getattr__(self, key: str):
+        return getattr(self.root, key)
+
+    def __getitem__(self, key: str):
+        return self.root[key]
+
+    def __setitem__(self, key: str, value):
+        self.root[key] = value
+
+    def __contains__(self, key: str) -> bool:
+        return key in self.root
+
+
+linkml_meta = LinkMLMeta(
+    {
+        "default_curi_maps": ["semweb_context"],
+        "default_prefix": "https://github.com/pha4ge/primer-schemes/schemas/primer-scheme/",
+        "default_range": "string",
+        "description": "Data model for tiling primer scheme definitions",
+        "id": "https://github.com/pha4ge/primer-schemes/schemas/primer-scheme",
+        "imports": ["linkml:types"],
+        "name": "primer-scheme",
+        "prefixes": {
+            "GENEPIO": {
+                "prefix_prefix": "GENEPIO",
+                "prefix_reference": "http://purl.obolibrary.org/obo/GENEPIO_",
+            },
+            "IAO": {
+                "prefix_prefix": "IAO",
+                "prefix_reference": "https://bioregistry.io/reference/iao:",
+            },
+            "ORCID": {
+                "prefix_prefix": "ORCID",
+                "prefix_reference": "http://identifiers.org/orcid/",
+            },
+            "linkml": {
+                "prefix_prefix": "linkml",
+                "prefix_reference": "https://w3id.org/linkml/",
+            },
+            "schema": {
+                "prefix_prefix": "schema",
+                "prefix_reference": "http://schema.org/",
+            },
+        },
+        "source_file": "/Users/bede/Research/git/primaschema/src/primaschema/schema/info.yml",
+    }
+)
+
+
 class SchemeStatus(str, Enum):
     """
     Status of this amplicon primer scheme
@@ -40,71 +91,186 @@ class PrimerScheme(ConfiguredBaseModel):
     A tiled amplicon PCR primer scheme definition
     """
 
+    linkml_meta: ClassVar[LinkMLMeta] = LinkMLMeta(
+        {
+            "from_schema": "https://github.com/pha4ge/primer-schemes/schemas/primer-scheme",
+            "tree_root": True,
+        }
+    )
+
     schema_version: str = Field(
-        ...,
+        default=...,
         description="""The version of the schema used to create this scheme definition""",
+        json_schema_extra={
+            "linkml_meta": {"alias": "schema_version", "domain_of": ["PrimerScheme"]}
+        },
     )
     name: str = Field(
-        ..., description="""The canonical name of the primer scheme (lowercase)"""
+        default=...,
+        description="""The canonical name of the primer scheme (lowercase)""",
+        json_schema_extra={
+            "linkml_meta": {
+                "alias": "name",
+                "domain_of": ["PrimerScheme", "Mask"],
+                "slot_uri": "GENEPIO:0001456",
+            }
+        },
     )
     amplicon_size: int = Field(
-        ...,
+        default=...,
         description="""The length (in base pairs) of an amplicon in the primer scheme""",
         ge=1,
+        json_schema_extra={
+            "linkml_meta": {
+                "alias": "amplicon_size",
+                "domain_of": ["PrimerScheme"],
+                "slot_uri": "GENEPIO:0001449",
+            }
+        },
     )
-    version: str = Field(...)
+    version: str = Field(
+        default=...,
+        json_schema_extra={
+            "linkml_meta": {"alias": "version", "domain_of": ["PrimerScheme"]}
+        },
+    )
     organism: str = Field(
-        ...,
+        default=...,
         description="""The organism against which this primer scheme is targeted. Lowercase, e.g. sars-cov-2""",
+        json_schema_extra={
+            "linkml_meta": {
+                "alias": "organism",
+                "domain_of": ["PrimerScheme"],
+                "slot_uri": "GENEPIO:0100682",
+            }
+        },
     )
     source_url: Optional[str] = Field(
-        None,
+        default=None,
         description="""Source URL of primer scheme BED file, if available, e.g. GitHub repository URL""",
+        json_schema_extra={
+            "linkml_meta": {"alias": "source_url", "domain_of": ["PrimerScheme"]}
+        },
     )
     definition_url: Optional[str] = Field(
-        None,
+        default=None,
         description="""GitHub URL of PHA4GE compatible primer scheme scheme definition""",
+        json_schema_extra={
+            "linkml_meta": {
+                "alias": "definition_url",
+                "domain_of": ["PrimerScheme"],
+                "slot_uri": "GENEPIO:0100683",
+            }
+        },
     )
-    aliases: Optional[List[str]] = Field(
-        default_factory=list, description="""Aliases for primer scheme name"""
+    aliases: Optional[list[str]] = Field(
+        default=None,
+        description="""Aliases for primer scheme name""",
+        json_schema_extra={
+            "linkml_meta": {
+                "alias": "aliases",
+                "domain_of": ["PrimerScheme"],
+                "slot_uri": "GENEPIO:0100670",
+            }
+        },
     )
     license: Optional[str] = Field(
-        None, description="""License under which the primer scheme is distributed"""
+        default=None,
+        description="""License under which the primer scheme is distributed""",
+        json_schema_extra={
+            "linkml_meta": {"alias": "license", "domain_of": ["PrimerScheme"]}
+        },
     )
     status: Optional[SchemeStatus] = Field(
-        "PUBLISHED",
+        default="PUBLISHED",
         description="""The status of this primer scheme (e.g. published, deprecated)""",
+        json_schema_extra={
+            "linkml_meta": {
+                "alias": "status",
+                "domain_of": ["PrimerScheme"],
+                "ifabsent": "string(PUBLISHED)",
+                "slot_uri": "GENEPIO:0100681",
+            }
+        },
     )
     derived_from: Optional[str] = Field(
-        None,
+        default=None,
         description="""Canonical name of the primer scheme from which this scheme was derived""",
+        json_schema_extra={
+            "linkml_meta": {
+                "alias": "derived_from",
+                "domain_of": ["PrimerScheme"],
+                "slot_uri": "GENEPIO:0100671",
+            }
+        },
     )
-    developers: List[str] = Field(
-        default_factory=list,
+    developers: list[str] = Field(
+        default=...,
         description="""Persons or organisations responsible for developing the primer scheme""",
+        json_schema_extra={
+            "linkml_meta": {
+                "alias": "developers",
+                "domain_of": ["PrimerScheme"],
+                "slot_uri": "GENEPIO:0100673",
+            }
+        },
     )
-    citations: Optional[List[str]] = Field(
-        default_factory=list,
+    citations: Optional[list[str]] = Field(
+        default=None,
         description="""URLs of publications describing the scheme (DOIs preferred when available)""",
+        json_schema_extra={
+            "linkml_meta": {
+                "alias": "citations",
+                "domain_of": ["PrimerScheme"],
+                "slot_uri": "IAO:0000301",
+            }
+        },
     )
-    notes: Optional[List[str]] = Field(
-        default_factory=list, description="""Notes about the amplicon primer scheme"""
+    notes: Optional[list[str]] = Field(
+        default=None,
+        description="""Notes about the amplicon primer scheme""",
+        json_schema_extra={
+            "linkml_meta": {
+                "alias": "notes",
+                "domain_of": ["PrimerScheme"],
+                "slot_uri": "GENEPIO:0100672",
+            }
+        },
     )
-    vendors: Optional[List[Vendor]] = Field(
-        default_factory=list,
+    vendors: Optional[list[Vendor]] = Field(
+        default=None,
         description="""Vendors where one can purchase the primers described in the amplicon scheme or a kit containing these primers""",
+        json_schema_extra={
+            "linkml_meta": {"alias": "vendors", "domain_of": ["PrimerScheme"]}
+        },
     )
-    masks: Optional[List[Mask]] = Field(
-        default_factory=list,
+    masks: Optional[list[Mask]] = Field(
+        default=None,
         description="""Regions of the reference genome that should be masked out with N""",
+        json_schema_extra={
+            "linkml_meta": {"alias": "masks", "domain_of": ["PrimerScheme"]}
+        },
     )
     primer_checksum: Optional[str] = Field(
-        None,
+        default=None,
         description="""Checksum for the primer scheme BED file, in format checksum_type:checksum, where checksum_type is lowercase name of checksum generator e.g. primaschema""",
+        json_schema_extra={
+            "linkml_meta": {
+                "alias": "primer_checksum",
+                "domain_of": ["PrimerScheme"],
+                "slot_uri": "GENEPIO:0100675",
+            }
+        },
     )
     reference_checksum: Optional[str] = Field(
-        None,
+        default=None,
         description="""Checksum for the reference FASTA file, in format checksum_type:checksum, where checksum_type is lowercase name of checksum generator e.g. primaschema""",
+        json_schema_extra={
+            "linkml_meta": {
+                "alias": "reference_checksum",
+                "domain_of": ["PrimerScheme"],
+            }
+        },
     )
 
     @field_validator("name")
@@ -112,11 +278,12 @@ class PrimerScheme(ConfiguredBaseModel):
         pattern = re.compile(r"^[\da-z0-9_.-]+$")
         if isinstance(v, list):
             for element in v:
-                if not pattern.match(element):
-                    raise ValueError(f"Invalid name format: {element}")
-        elif isinstance(v, str):
-            if not pattern.match(v):
-                raise ValueError(f"Invalid name format: {v}")
+                if isinstance(element, str) and not pattern.match(element):
+                    err_msg = f"Invalid name format: {element}"
+                    raise ValueError(err_msg)
+        elif isinstance(v, str) and not pattern.match(v):
+            err_msg = f"Invalid name format: {v}"
+            raise ValueError(err_msg)
         return v
 
     @field_validator("version")
@@ -124,11 +291,12 @@ class PrimerScheme(ConfiguredBaseModel):
         pattern = re.compile(r"^[\da-z0-9_.-]+$")
         if isinstance(v, list):
             for element in v:
-                if not pattern.match(element):
-                    raise ValueError(f"Invalid version format: {element}")
-        elif isinstance(v, str):
-            if not pattern.match(v):
-                raise ValueError(f"Invalid version format: {v}")
+                if isinstance(element, str) and not pattern.match(element):
+                    err_msg = f"Invalid version format: {element}"
+                    raise ValueError(err_msg)
+        elif isinstance(v, str) and not pattern.match(v):
+            err_msg = f"Invalid version format: {v}"
+            raise ValueError(err_msg)
         return v
 
 
@@ -137,12 +305,37 @@ class Vendor(ConfiguredBaseModel):
     Vendor of the primers described in the amplicon scheme or a kit containing these primers
     """
 
-    organisation_name: str = Field(..., description="""The name of the vendor""")
+    linkml_meta: ClassVar[LinkMLMeta] = LinkMLMeta(
+        {
+            "class_uri": "GENEPIO:0100674",
+            "from_schema": "https://github.com/pha4ge/primer-schemes/schemas/primer-scheme",
+        }
+    )
+
+    organisation_name: str = Field(
+        default=...,
+        description="""The name of the vendor""",
+        json_schema_extra={
+            "linkml_meta": {"alias": "organisation_name", "domain_of": ["Vendor"]}
+        },
+    )
     home_page: Optional[str] = Field(
-        None, description="""A link to the home page of the vendor"""
+        default=None,
+        description="""A link to the home page of the vendor""",
+        json_schema_extra={
+            "linkml_meta": {"alias": "home_page", "domain_of": ["Vendor"]}
+        },
     )
     kit_name: Optional[str] = Field(
-        None, description="""Vendor specific kit name for primer kit"""
+        default=None,
+        description="""Vendor specific kit name for primer kit""",
+        json_schema_extra={
+            "linkml_meta": {
+                "alias": "kit_name",
+                "domain_of": ["Vendor"],
+                "slot_uri": "GENEPIO:0100693",
+            }
+        },
     )
 
 
@@ -151,10 +344,38 @@ class Mask(ConfiguredBaseModel):
     A region to mask out, with zero-based, half open coordinates
     """
 
-    reference: str = Field(..., description="""Name (ID) of the reference sequence""")
-    name: str = Field(..., description="""Name of the region""")
-    start: int = Field(..., description="""Start coordinate of the region""", ge=1)
-    end: int = Field(..., description="""End coordination of the region""", ge=1)
+    linkml_meta: ClassVar[LinkMLMeta] = LinkMLMeta(
+        {
+            "from_schema": "https://github.com/pha4ge/primer-schemes/schemas/primer-scheme"
+        }
+    )
+
+    reference: str = Field(
+        default=...,
+        description="""Name (ID) of the reference sequence""",
+        json_schema_extra={
+            "linkml_meta": {"alias": "reference", "domain_of": ["Mask"]}
+        },
+    )
+    name: str = Field(
+        default=...,
+        description="""Name of the region""",
+        json_schema_extra={
+            "linkml_meta": {"alias": "name", "domain_of": ["PrimerScheme", "Mask"]}
+        },
+    )
+    start: int = Field(
+        default=...,
+        description="""Start coordinate of the region""",
+        ge=1,
+        json_schema_extra={"linkml_meta": {"alias": "start", "domain_of": ["Mask"]}},
+    )
+    end: int = Field(
+        default=...,
+        description="""End coordination of the region""",
+        ge=1,
+        json_schema_extra={"linkml_meta": {"alias": "end", "domain_of": ["Mask"]}},
+    )
 
 
 # Model rebuild
