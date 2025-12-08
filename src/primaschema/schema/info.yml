@@ -28,7 +28,7 @@ classes:
       - aliases
       - license
       - status
-      - labels
+      - tags
       - derived_from
       - citations
       - notes
@@ -78,9 +78,11 @@ slots:
     description: The canonical name of the primer scheme (lowercase)
     pattern: "^[\\da-z0-9_.-]+$"
   version:
+    description: The semantic version of the scheme (v.{x}.{y}.{z})
     required: true
     pattern: "^v\\d+\\.\\d+\\.\\d+(-[a-z0-9]+)?$"
   contributors:
+    description: Individuals, organisations, or institutions that have contributed to the development
     required: true
     multivalued: true
     inlined_as_list: true
@@ -137,8 +139,14 @@ slots:
   derived_from:
     slot_uri: GENEPIO:0100671
     description: "Canonical name of the primer scheme from which this scheme was derived"
+  tags:
+    description: "Tags to describe the primerscheme"
+    range: SchemeTag
+    multivalued: true
+    inlined_as_list: true
 
 
+  
 enums:
   SchemeStatus:
     description: "Status of this amplicon primer scheme"
@@ -152,8 +160,8 @@ enums:
     description: "License under which the primer scheme is distributed"
     permissible_values:
       CC-BY-SA-4.0:
-  SchemeLabel:
-    description: "Label for this primer scheme"
+  SchemeTag:
+    description: "Tag for this primer scheme"
     permissible_values:
       WASTEWATER:
       CLINICAL:
