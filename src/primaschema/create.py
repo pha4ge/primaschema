@@ -6,23 +6,28 @@ from primaschema.schema.info import (
     SchemeStatus,
     SchemeTag,
 )
-from hashlib import sha256
-from typing import Annotated, Any, List
+from typing import Annotated, Any, List, Optional
 import json
 import pathlib
 import shutil
 import sys
-import yaml
 from primalbedtools.validate import validate
 from primalbedtools.bedfiles import BedLineParser, sort_bedlines
 
 from cyclopts import App, Parameter, validators
-from pydantic import BeforeValidator, model_validator, BaseModel, PositiveInt, Field
-from pydantic_core import from_json
+from pydantic import BeforeValidator, model_validator
 
 from rich.console import Console
 from rich.traceback import install as install_rich_traceback
-
+from primaschema import METADATA_FILE_NAME, logger
+from primaschema.schema.manifest import (
+    PrimerSchemeIndex,
+    ManifestPrimerScheme,
+    update_index,
+)
+from primaschema.cli import configure_logging
+from primaschema.util import sha256_checksum, find_all_info_json
+from primaschema.validate import validate_all
 
 LICENSE_TXT_CC_BY_SA_4_0 = """\n\n------------------------------------------------------------------------
 
@@ -45,6 +50,12 @@ app = App(
 )
 modify_app = App(name="modify")
 app.command(modify_app)
+
+index_app = App(name="index")
+app.command(index_app)
+
+validate_app = App(name="validate")
+app.command(validate_app)
 
 
 def parse_contributor_single(v: Any) -> Contributor:
@@ -136,19 +147,6 @@ def _save_and_regenerate(info_path: pathlib.Path, ps: PrimerScheme):
     print(f"Updated {info_path} and regenerated README.md")
 
 
-def sha256_checksum(filename: pathlib.Path):
-    """
-    Docstring for sha256_checksum
-
-    :param filename: Description
-    """
-    sha256_hasher = sha256()
-    with open(filename, "rb") as f:
-        for block in iter(lambda: f.read(65536), b""):
-            sha256_hasher.update(block)
-    return sha256_hasher.hexdigest()
-
-
 def create_status_badge(primerscheme: PrimerScheme) -> str:
     """
     Create a badge for the README.md file
@@ -186,8 +184,9 @@ def generate_readme(
         readme.write(f"{create_status_badge(primerscheme)}\n\n")
 
         # Add citation if present
-        for cit in primerscheme.citations:
-            readme.write(f"> If you use this scheme please cite: {cit}\n\n")
+        if primerscheme.citations and primerscheme.citations is not None:
+            for cit in primerscheme.citations:
+                readme.write(f"> If you use this scheme please cite: {cit}\n\n")
 
         readme.write(
             f"[primalscheme labs](https://labs.primalscheme.com/detail/{primerscheme.name}/{primerscheme.amplicon_size}/{primerscheme.version})\n\n"
@@ -282,17 +281,25 @@ def create(
         Parameter(name="*"),
     ],
     bed_path: Annotated[
-        pathlib.Path, Parameter(validator=validators.Path(exists=True, file_okay=True), help="The path to the corresponding primer.bed file")
+        pathlib.Path,
+        Parameter(
+            validator=validators.Path(exists=True, file_okay=True),
+            help="The path to the corresponding primer.bed file",
+        ),
     ],
     reference_path: Annotated[
-        pathlib.Path, Parameter(validator=validators.Path(exists=True, file_okay=True),  help="The path to the corresponding reference.fasta file")
+        pathlib.Path,
+        Parameter(
+            validator=validators.Path(exists=True, file_okay=True),
+            help="The path to the corresponding reference.fasta file",
+        ),
     ],
     primer_schemes_path: Annotated[
         pathlib.Path,
         Parameter(
             env_var="PRIMER_SCHEMES_PATH",
             validator=validators.Path(exists=True, dir_okay=True, file_okay=False),
-            help="The path to the primerschemes directory. Will use the ENV VAR PRIMER_SCHEMES_PATH"
+            help="The path to the primerschemes directory. Will use the ENV VAR PRIMER_SCHEMES_PATH",
         ),
     ],
 ):
@@ -300,7 +307,7 @@ def create(
     ps = PrimerScheme.model_validate(cli_ps.model_dump())
 
     # Validate the bed and ref files files
-    validate(bed_path, str(reference_path.absolute()))
+    validate(str(bed_path), str(reference_path.absolute()))
 
     # Create a directory to store the new scheme in.
     output_dir = primer_schemes_path / ps.name / str(ps.amplicon_size) / ps.version
@@ -321,10 +328,12 @@ def create(
 
     # Generate hashes of the files
     ps.primer_file_sha256 = sha256_checksum(output_bed)
-    ps.reference_file_sha256 = sha256_checksum(output_bed)
+    ps.reference_file_sha256 = sha256_checksum(output_ref)
+
+    # TODO add primaschema hashes
 
     # Write info.json
-    with open(output_dir / "info.json", "w") as f:
+    with open(output_dir / METADATA_FILE_NAME, "w") as f:
         data = ps.model_dump_json(exclude_unset=True, exclude_none=True, indent=1)
         f.write(data)
 
@@ -512,6 +521,60 @@ def update_status(
     ps = PrimerScheme.model_validate_json(info_path.read_text())
     ps.status = status
     _save_and_regenerate(info_path, ps)
+
+
+# Index commands
+@app.command
+def build_index(
+    primer_schemes_path: Annotated[
+        pathlib.Path,
+        Parameter(
+            env_var="PRIMER_SCHEMES_PATH",
+            validator=validators.Path(exists=True, dir_okay=True, file_okay=False),
+            help="The path to the primerschemes directory. Will use the ENV VAR PRIMER_SCHEMES_PATH",
+        ),
+    ],
+    manifest_path: Optional[pathlib.Path] = None,
+    base_url: str = "",
+):
+    # Set up logging
+    configure_logging(debug=True)
+
+    # Read in current manifest
+    if manifest_path is not None:
+        psi = PrimerSchemeIndex.model_validate_json(manifest_path.read_text())
+    else:
+        psi = PrimerSchemeIndex()
+
+    # find all primerschemes
+    ps = []
+    for ps_info in find_all_info_json(primer_schemes_path):
+        logger.debug(f"found {ps_info}")
+        ps.append(PrimerScheme.model_validate_json(ps_info.read_text()))
+
+    update_index(ps, psi, base_url=base_url)
+
+    # Ensure schemes is marked as set for exclude_unset=True
+    psi.primerschemes = psi.primerschemes
+
+    print(psi.model_dump_json(exclude_unset=True, exclude_none=True))
+
+
+# Validate commands
+@validate_app.command
+def all(
+    primer_schemes_path: Annotated[
+        pathlib.Path,
+        Parameter(
+            env_var="PRIMER_SCHEMES_PATH",
+            validator=validators.Path(exists=True, dir_okay=True, file_okay=False),
+            help="The path to the primerschemes directory. Will use the ENV VAR PRIMER_SCHEMES_PATH",
+        ),
+    ],
+    additional_linkml: bool = False,
+):
+    configure_logging(debug=True)
+    validate_all(primer_schemes_path, additional_linkml)
 
 
 app()
