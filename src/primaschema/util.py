@@ -6,8 +6,10 @@ from io import BytesIO
 from pathlib import Path
 
 import httpx
-
+from hashlib import sha256
 from . import logger
+
+from primaschema import METADATA_FILE_NAME
 
 
 def run(cmd, cwd="./"):  # Helper for CLI testing
@@ -54,3 +56,20 @@ def download_github_tarball(archive_url: str, out_dir: Path) -> None:
     copy_single_child_dir_to_parent(out_dir)
 
     logger.info(f"Schemes downloaded and extracted to {out_dir}")
+
+
+def sha256_checksum(filename: Path):
+    """
+    Docstring for sha256_checksum
+
+    :param filename: Description
+    """
+    sha256_hasher = sha256()
+    with open(filename, "rb") as f:
+        for block in iter(lambda: f.read(4096), b""):
+            sha256_hasher.update(block)
+    return sha256_hasher.hexdigest()
+
+
+def find_all_info_json(primerschemes_repo: Path):
+    return list(primerschemes_repo.rglob(f"*/{METADATA_FILE_NAME}"))

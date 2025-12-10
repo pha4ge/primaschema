@@ -18,7 +18,7 @@ from Bio import SeqIO
 
 from linkml.generators.pydanticgen import PydanticGenerator
 
-from . import (
+from primaschema import (
     logger,
     MANIFEST_HEADER_PATH,
     CACHE_DIR,
@@ -26,8 +26,8 @@ from . import (
     SCHEMES_ARCHIVE_URL,
 )
 
-from .schema import bed, info
-from . import util
+from primaschema.schema import bed, info
+from primaschema import util
 import json
 
 

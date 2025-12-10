@@ -12,6 +12,10 @@ from platformdirs import user_data_dir
 __version__ = "1.0.0a0"
 
 
+METADATA_FILE_NAME: str = "info.json"
+PRIMER_FILE_NAME: str = "primer.bed"
+REFERENCE_FILE_NAME: str = "reference.fasta"
+
 SCHEMES_ARCHIVE_URL = os.environ.get(
     "PRIMASCHEMA_SCHEMES_ARCHIVE_URL",
     "https://github.com/pha4ge/primer-schemes/archive/refs/heads/main.tar.gz",
