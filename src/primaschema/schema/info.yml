@@ -8,6 +8,7 @@ prefixes:
   ORCID: http://identifiers.org/orcid/
   GENEPIO: http://purl.obolibrary.org/obo/GENEPIO_
   IAO: "http://purl.obolibrary.org/obo/IAO_"
+  EDAM: "http://edamontology.org/data_"
 default_curi_maps:
   - semweb_context
 imports:
@@ -18,13 +19,23 @@ classes:
   PrimerScheme:
     tree_root: true
     description: "A tiled amplicon PCR primer scheme definition"
+    rules:
+      - description: "Require version suffix for ref selection"
+        preconditions:
+          slot_conditions:
+            version:
+              pattern: "^v\\d+\\.\\d+\\.\\d+$" 
+        postconditions:
+          slot_conditions:
+            ref_selections:
+              maximum_cardinality: 0
     slots:
       - schema_version
       - name
       - amplicon_size
       - version
       - contributors
-      - organism
+      - target_organisms
       - aliases
       - license
       - status
@@ -33,10 +44,12 @@ classes:
       - citations
       - notes
       - vendors
+      - algorithm
       - primer_checksum
       - primer_file_sha256
       - reference_checksum
       - reference_file_sha256
+      - ref_selections
 
   Vendor:
     class_uri: GENEPIO:0100674
@@ -67,6 +80,38 @@ classes:
         description: "Contact email"
         pattern: "^[\\w\\-\\.]+@([\\w-]+\\.)+[\\w-]{2,}$"
 
+  Algorithm:
+    class_uri: IAO:0000064
+    description: "Algorithm used to generate the primerscheme"
+    attributes:
+      name:
+        description: "The name of the Algorithm"
+        required: true
+      version: 
+        slot_uri: IAO:0000129
+        description: "The version of the Algorithm"
+
+  RefSelection:
+      attributes:
+        file_sha256:
+          description: SHA256 checksum for the reference selection file
+          pattern: "^[a-fA-F0-9]{64}$"
+        file_name: 
+          description: File name of the reference selection file
+        chromosome: 
+          description: The chromosome in the primerbed file this provides reference selection for
+
+  TargetOrganism:
+    class_uri: EDAM:1869
+    description: "The organism or pathogen targeted by primerscheme"
+    attributes:
+      common_name:
+        slot_uri: EDAM:1874
+        description: The common name of the organism
+      ncbi_tax_id:
+        slot_uri: EDAM:1179
+        description: A stable unique identifier for each taxon (for a species, a family, an order, or any other group) in the NCBI taxonomy database.
+
 slots:
   schema_version:
     required: true
@@ -87,10 +132,14 @@ slots:
     multivalued: true
     inlined_as_list: true
     range: Contributor
-  organism:
-    slot_uri: GENEPIO:0100682
+  target_organisms:
+    slot_uri: EDAM:1869 # GENEPIO:0100682 maybe custom
     required: true
-    description: The organism against which this primer scheme is targeted. Lowercase, e.g. sars-cov-2
+    description: The organism against which this primer scheme is targeted. 
+    range: TargetOrganism
+    multivalued: true
+    inlined_as_list: true
+
   aliases:
     slot_uri: GENEPIO:0100670
     description: Aliases for primer scheme name
@@ -132,18 +181,30 @@ slots:
     description: "Checksum for the primer scheme BED file, in format checksum_type:checksum, where checksum_type is lowercase name of checksum generator e.g. primaschema"
   primer_file_sha256:
     description: "SHA256 checksum for the primer scheme BED file"
+    pattern: "^[a-fA-F0-9]{64}$"
   reference_checksum:
     description: "Checksum for the reference FASTA file, in format checksum_type:checksum, where checksum_type is lowercase name of checksum generator e.g. primaschema"
   reference_file_sha256:
     description: "SHA256 checksum for the reference FASTA file"
+    pattern: "^[a-fA-F0-9]{64}$"
   derived_from:
     slot_uri: GENEPIO:0100671
     description: "Canonical name of the primer scheme from which this scheme was derived"
-  tags:
+  tags: 
     description: "Tags to describe the primerscheme"
     range: SchemeTag
     multivalued: true
     inlined_as_list: true
+  algorithm:
+    range: Algorithm
+    inlined_as_list: true
+  ref_selections:
+    description: "Optional reference selections"
+    range: RefSelection
+    multivalued: true
+    inlined_as_list: true
+    required: false
+
 
 
   
@@ -163,5 +224,10 @@ enums:
   SchemeTag:
     description: "Tag for this primer scheme"
     permissible_values:
-      WASTEWATER:
+      WASTE-WATER:
       CLINICAL:
+      FULL-GENOME:
+      MULTI-TARGET:
+      PANEL:
+      QPCR:
+

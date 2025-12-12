@@ -85,7 +85,9 @@ linkml_meta = LinkMLMeta({'default_curi_maps': ['semweb_context'],
      'id': 'https://github.com/pha4ge/primer-schemes/schemas/primer-scheme',
      'imports': ['linkml:types'],
      'name': 'primer-scheme',
-     'prefixes': {'GENEPIO': {'prefix_prefix': 'GENEPIO',
+     'prefixes': {'EDAM': {'prefix_prefix': 'EDAM',
+                           'prefix_reference': 'http://edamontology.org/data_'},
+                  'GENEPIO': {'prefix_prefix': 'GENEPIO',
                               'prefix_reference': 'http://purl.obolibrary.org/obo/GENEPIO_'},
                   'IAO': {'prefix_prefix': 'IAO',
                           'prefix_reference': 'http://purl.obolibrary.org/obo/IAO_'},
@@ -119,8 +121,12 @@ class SchemeTag(str, Enum):
     """
     Tag for this primer scheme
     """
-    WASTEWATER = "WASTEWATER"
+    WASTE_WATER = "WASTE-WATER"
     CLINICAL = "CLINICAL"
+    FULL_GENOME = "FULL-GENOME"
+    MULTI_TARGET = "MULTI-TARGET"
+    PANEL = "PANEL"
+    QPCR = "QPCR"
 
 
 
@@ -129,14 +135,20 @@ class PrimerScheme(ConfiguredBaseModel):
     A tiled amplicon PCR primer scheme definition
     """
     linkml_meta: ClassVar[LinkMLMeta] = LinkMLMeta({'from_schema': 'https://github.com/pha4ge/primer-schemes/schemas/primer-scheme',
+         'rules': [{'description': 'Require version suffix for ref selection',
+                    'postconditions': {'slot_conditions': {'ref_selections': {'maximum_cardinality': 0,
+                                                                              'name': 'ref_selections'}}},
+                    'preconditions': {'slot_conditions': {'version': {'name': 'version',
+                                                                      'pattern': '^v\\d+\\.\\d+\\.\\d+$'}}}}],
          'tree_root': True})
 
     schema_version: str = Field(default=..., description="""The version of the schema used to create this scheme definition""", json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme']} })
-    name: str = Field(default=..., description="""The canonical name of the primer scheme (lowercase)""", json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme', 'Contributor'], 'slot_uri': 'GENEPIO:0001456'} })
+    name: str = Field(default=..., description="""The canonical name of the primer scheme (lowercase)""", json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme', 'Contributor', 'Algorithm'],
+         'slot_uri': 'GENEPIO:0001456'} })
     amplicon_size: int = Field(default=..., description="""The length (in base pairs) of an amplicon in the primer scheme""", ge=1, json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme'], 'slot_uri': 'GENEPIO:0001449'} })
-    version: str = Field(default=..., description="""The semantic version of the scheme (v.{x}.{y}.{z})""", json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme']} })
+    version: str = Field(default=..., description="""The semantic version of the scheme (v.{x}.{y}.{z})""", json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme', 'Algorithm']} })
     contributors: list[Contributor] = Field(default=..., description="""Individuals, organisations, or institutions that have contributed to the development""", json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme']} })
-    organism: str = Field(default=..., description="""The organism against which this primer scheme is targeted. Lowercase, e.g. sars-cov-2""", json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme'], 'slot_uri': 'GENEPIO:0100682'} })
+    target_organisms: list[TargetOrganism] = Field(default=..., description="""The organism against which this primer scheme is targeted.""", json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme'], 'slot_uri': 'EDAM:1869'} })
     aliases: Optional[list[str]] = Field(default=[], description="""Aliases for primer scheme name""", json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme'], 'slot_uri': 'GENEPIO:0100670'} })
     license: Optional[SchemeLicense] = Field(default='CC-BY-SA-4.0', description="""License under which the primer scheme is distributed""", json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme'], 'ifabsent': 'SchemeLicense(CC-BY-SA-4.0)'} })
     status: SchemeStatus = Field(default=..., description="""The status of this primer scheme (e.g. published, deprecated)""", json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme'], 'slot_uri': 'GENEPIO:0100681'} })
@@ -145,10 +157,12 @@ class PrimerScheme(ConfiguredBaseModel):
     citations: Optional[list[str]] = Field(default=[], description="""URLs of publications describing the scheme (DOIs preferred when available)""", json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme'], 'slot_uri': 'IAO:0000301'} })
     notes: Optional[list[str]] = Field(default=[], description="""Notes about the amplicon primer scheme""", json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme'], 'slot_uri': 'GENEPIO:0100672'} })
     vendors: Optional[list[Vendor]] = Field(default=[], description="""Vendors where one can purchase the primers described in the amplicon scheme or a kit containing these primers""", json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme']} })
+    algorithm: Optional[Algorithm] = Field(default=None, json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme']} })
     primer_checksum: Optional[str] = Field(default=None, description="""Checksum for the primer scheme BED file, in format checksum_type:checksum, where checksum_type is lowercase name of checksum generator e.g. primaschema""", json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme'], 'slot_uri': 'GENEPIO:0100675'} })
     primer_file_sha256: Optional[str] = Field(default=None, description="""SHA256 checksum for the primer scheme BED file""", json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme']} })
     reference_checksum: Optional[str] = Field(default=None, description="""Checksum for the reference FASTA file, in format checksum_type:checksum, where checksum_type is lowercase name of checksum generator e.g. primaschema""", json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme']} })
     reference_file_sha256: Optional[str] = Field(default=None, description="""SHA256 checksum for the reference FASTA file""", json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme']} })
+    ref_selections: Optional[list[RefSelection]] = Field(default=[], description="""Optional reference selections""", json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme']} })
 
     @field_validator('name')
     def pattern_name(cls, v):
@@ -176,6 +190,32 @@ class PrimerScheme(ConfiguredBaseModel):
             raise ValueError(err_msg)
         return v
 
+    @field_validator('primer_file_sha256')
+    def pattern_primer_file_sha256(cls, v):
+        pattern=re.compile(r"^[a-fA-F0-9]{64}$")
+        if isinstance(v, list):
+            for element in v:
+                if isinstance(element, str) and not pattern.match(element):
+                    err_msg = f"Invalid primer_file_sha256 format: {element}"
+                    raise ValueError(err_msg)
+        elif isinstance(v, str) and not pattern.match(v):
+            err_msg = f"Invalid primer_file_sha256 format: {v}"
+            raise ValueError(err_msg)
+        return v
+
+    @field_validator('reference_file_sha256')
+    def pattern_reference_file_sha256(cls, v):
+        pattern=re.compile(r"^[a-fA-F0-9]{64}$")
+        if isinstance(v, list):
+            for element in v:
+                if isinstance(element, str) and not pattern.match(element):
+                    err_msg = f"Invalid reference_file_sha256 format: {element}"
+                    raise ValueError(err_msg)
+        elif isinstance(v, str) and not pattern.match(v):
+            err_msg = f"Invalid reference_file_sha256 format: {v}"
+            raise ValueError(err_msg)
+        return v
+
 
 class Vendor(ConfiguredBaseModel):
     """
@@ -196,7 +236,8 @@ class Contributor(ConfiguredBaseModel):
     linkml_meta: ClassVar[LinkMLMeta] = LinkMLMeta({'class_uri': 'IAO:contributor',
          'from_schema': 'https://github.com/pha4ge/primer-schemes/schemas/primer-scheme'})
 
-    name: str = Field(default=..., description="""The name of the person or organisation""", json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme', 'Contributor'], 'slot_uri': 'IAO:0000590'} })
+    name: str = Field(default=..., description="""The name of the person or organisation""", json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme', 'Contributor', 'Algorithm'],
+         'slot_uri': 'IAO:0000590'} })
     orcid: Optional[str] = Field(default=None, description="""ORCID ('Open Researcher and Contributor IDentifier') of a person""", json_schema_extra = { "linkml_meta": {'domain_of': ['Contributor'], 'slot_uri': 'IAO:0000708'} })
     email: Optional[str] = Field(default=None, description="""Contact email""", json_schema_extra = { "linkml_meta": {'domain_of': ['Contributor'], 'slot_uri': 'IAO:0000429'} })
 
@@ -214,8 +255,54 @@ class Contributor(ConfiguredBaseModel):
         return v
 
 
+class Algorithm(ConfiguredBaseModel):
+    """
+    Algorithm used to generate the primerscheme
+    """
+    linkml_meta: ClassVar[LinkMLMeta] = LinkMLMeta({'class_uri': 'IAO:0000064',
+         'from_schema': 'https://github.com/pha4ge/primer-schemes/schemas/primer-scheme'})
+
+    name: str = Field(default=..., description="""The name of the Algorithm""", json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme', 'Contributor', 'Algorithm']} })
+    version: Optional[str] = Field(default=None, description="""The version of the Algorithm""", json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme', 'Algorithm'], 'slot_uri': 'IAO:0000129'} })
+
+
+class RefSelection(ConfiguredBaseModel):
+    linkml_meta: ClassVar[LinkMLMeta] = LinkMLMeta({'from_schema': 'https://github.com/pha4ge/primer-schemes/schemas/primer-scheme'})
+
+    file_sha256: Optional[str] = Field(default=None, description="""SHA256 checksum for the reference selection file""", json_schema_extra = { "linkml_meta": {'domain_of': ['RefSelection']} })
+    file_name: Optional[str] = Field(default=None, description="""File name of the reference selection file""", json_schema_extra = { "linkml_meta": {'domain_of': ['RefSelection']} })
+    chromosome: Optional[str] = Field(default=None, description="""The chromosome in the primerbed file this provides reference selection for""", json_schema_extra = { "linkml_meta": {'domain_of': ['RefSelection']} })
+
+    @field_validator('file_sha256')
+    def pattern_file_sha256(cls, v):
+        pattern=re.compile(r"^[a-fA-F0-9]{64}$")
+        if isinstance(v, list):
+            for element in v:
+                if isinstance(element, str) and not pattern.match(element):
+                    err_msg = f"Invalid file_sha256 format: {element}"
+                    raise ValueError(err_msg)
+        elif isinstance(v, str) and not pattern.match(v):
+            err_msg = f"Invalid file_sha256 format: {v}"
+            raise ValueError(err_msg)
+        return v
+
+
+class TargetOrganism(ConfiguredBaseModel):
+    """
+    The organism or pathogen targeted by primerscheme
+    """
+    linkml_meta: ClassVar[LinkMLMeta] = LinkMLMeta({'class_uri': 'EDAM:1869',
+         'from_schema': 'https://github.com/pha4ge/primer-schemes/schemas/primer-scheme'})
+
+    common_name: Optional[str] = Field(default=None, description="""The common name of the organism""", json_schema_extra = { "linkml_meta": {'domain_of': ['TargetOrganism'], 'slot_uri': 'EDAM:1874'} })
+    ncbi_tax_id: Optional[str] = Field(default=None, description="""A stable unique identifier for each taxon (for a species, a family, an order, or any other group) in the NCBI taxonomy database.""", json_schema_extra = { "linkml_meta": {'domain_of': ['TargetOrganism'], 'slot_uri': 'EDAM:1179'} })
+
+
 # Model rebuild
 # see https://pydantic-docs.helpmanual.io/usage/models/#rebuilding-a-model
 PrimerScheme.model_rebuild()
 Vendor.model_rebuild()
 Contributor.model_rebuild()
+Algorithm.model_rebuild()
+RefSelection.model_rebuild()
+TargetOrganism.model_rebuild()
