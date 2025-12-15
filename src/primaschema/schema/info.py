@@ -157,7 +157,7 @@ class PrimerScheme(ConfiguredBaseModel):
     citations: Optional[list[str]] = Field(default=[], description="""URLs of publications describing the scheme (DOIs preferred when available)""", json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme'], 'slot_uri': 'IAO:0000301'} })
     notes: Optional[list[str]] = Field(default=[], description="""Notes about the amplicon primer scheme""", json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme'], 'slot_uri': 'GENEPIO:0100672'} })
     vendors: Optional[list[Vendor]] = Field(default=[], description="""Vendors where one can purchase the primers described in the amplicon scheme or a kit containing these primers""", json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme']} })
-    algorithm: Optional[Algorithm] = Field(default=None, json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme']} })
+    algorithm: Optional[Algorithm] = Field(default=None, description="""The algorithm (if any) used to generate this primerscheme""", json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme']} })
     primer_checksum: Optional[str] = Field(default=None, description="""Checksum for the primer scheme BED file, in format checksum_type:checksum, where checksum_type is lowercase name of checksum generator e.g. primaschema""", json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme'], 'slot_uri': 'GENEPIO:0100675'} })
     primer_file_sha256: Optional[str] = Field(default=None, description="""SHA256 checksum for the primer scheme BED file""", json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme']} })
     reference_checksum: Optional[str] = Field(default=None, description="""Checksum for the reference FASTA file, in format checksum_type:checksum, where checksum_type is lowercase name of checksum generator e.g. primaschema""", json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme']} })
@@ -271,7 +271,7 @@ class RefSelection(ConfiguredBaseModel):
 
     file_sha256: Optional[str] = Field(default=None, description="""SHA256 checksum for the reference selection file""", json_schema_extra = { "linkml_meta": {'domain_of': ['RefSelection']} })
     file_name: Optional[str] = Field(default=None, description="""File name of the reference selection file""", json_schema_extra = { "linkml_meta": {'domain_of': ['RefSelection']} })
-    chromosome: Optional[str] = Field(default=None, description="""The chromosome in the primerbed file this provides reference selection for""", json_schema_extra = { "linkml_meta": {'domain_of': ['RefSelection']} })
+    chromosome: Optional[str] = Field(default=None, description="""The chromosome in the primerbed file for which this provides reference selection""", json_schema_extra = { "linkml_meta": {'domain_of': ['RefSelection']} })
 
     @field_validator('file_sha256')
     def pattern_file_sha256(cls, v):
@@ -289,13 +289,13 @@ class RefSelection(ConfiguredBaseModel):
 
 class TargetOrganism(ConfiguredBaseModel):
     """
-    The organism or pathogen targeted by primerscheme
+    The organisms targeted by this primerscheme
     """
     linkml_meta: ClassVar[LinkMLMeta] = LinkMLMeta({'class_uri': 'EDAM:1869',
          'from_schema': 'https://github.com/pha4ge/primer-schemes/schemas/primer-scheme'})
 
     common_name: Optional[str] = Field(default=None, description="""The common name of the organism""", json_schema_extra = { "linkml_meta": {'domain_of': ['TargetOrganism'], 'slot_uri': 'EDAM:1874'} })
-    ncbi_tax_id: Optional[str] = Field(default=None, description="""A stable unique identifier for each taxon (for a species, a family, an order, or any other group) in the NCBI taxonomy database.""", json_schema_extra = { "linkml_meta": {'domain_of': ['TargetOrganism'], 'slot_uri': 'EDAM:1179'} })
+    ncbi_tax_id: Optional[str] = Field(default=None, description="""A stable unique identifier for each taxon (for a species, a family, an order, or any other group) in the NCBI taxonomy database""", json_schema_extra = { "linkml_meta": {'domain_of': ['TargetOrganism'], 'slot_uri': 'EDAM:1179'} })
 
 
 # Model rebuild

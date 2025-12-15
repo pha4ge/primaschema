@@ -7,27 +7,10 @@ from primaschema.schema.info import (
     SchemeLicense,
     SchemeTag,
     SchemeStatus,
+    TargetOrganism,
 )
 
 from primaschema import PRIMER_FILE_NAME, REFERENCE_FILE_NAME, METADATA_FILE_NAME
-
-# Exact fields and validators from the PrimerScheme model
-# Slightly hacky but ensures consistent valuation
-# TODO check performance is not degraded by running dynamic class allocation
-
-
-EXTRACTED_FIELDS = {
-    "name",
-    "version",
-    "amplicon_size",
-    "organism",
-    "status",
-    "license",
-    "tags",
-    "contributors",
-    "primer_file_sha256",
-    "reference_file_sha256",
-}
 
 
 class ManifestPrimerScheme(BaseModel):
@@ -36,10 +19,6 @@ class ManifestPrimerScheme(BaseModel):
     """
 
     # Taken from PrimerScheme
-    schema_version: str = Field(
-        default=...,
-        description="""The version of the schema used to create this scheme definition""",
-    )
     name: str = Field(
         default=...,
         description="""The canonical name of the primer scheme (lowercase)""",
@@ -57,7 +36,7 @@ class ManifestPrimerScheme(BaseModel):
         default=...,
         description="""Individuals, organisations, or institutions that have contributed to the development""",
     )
-    organism: str = Field(
+    target_organisms: list[TargetOrganism] = Field(
         default=...,
         description="""The organism against which this primer scheme is targeted. Lowercase, e.g. sars-cov-2""",
     )
@@ -116,12 +95,11 @@ class ManifestPrimerScheme(BaseModel):
     ) -> "ManifestPrimerScheme":
         """Create a ManifestPrimerScheme from a PrimerScheme instance."""
         return cls(
-            schema_version=scheme.schema_version,
             name=scheme.name,
             amplicon_size=scheme.amplicon_size,
             version=scheme.version,
             contributors=scheme.contributors,
-            organism=scheme.organism,
+            target_organisms=scheme.target_organisms,
             license=scheme.license or SchemeLicense.CC_BY_SA_4FULL_STOP0,
             status=scheme.status,
             tags=scheme.tags,

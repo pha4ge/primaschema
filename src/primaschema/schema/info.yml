@@ -99,18 +99,18 @@ classes:
         file_name: 
           description: File name of the reference selection file
         chromosome: 
-          description: The chromosome in the primerbed file this provides reference selection for
+          description: The chromosome in the primerbed file for which this provides reference selection
 
   TargetOrganism:
     class_uri: EDAM:1869
-    description: "The organism or pathogen targeted by primerscheme"
+    description: "The organisms targeted by this primerscheme"
     attributes:
       common_name:
         slot_uri: EDAM:1874
         description: The common name of the organism
       ncbi_tax_id:
         slot_uri: EDAM:1179
-        description: A stable unique identifier for each taxon (for a species, a family, an order, or any other group) in the NCBI taxonomy database.
+        description: A stable unique identifier for each taxon (for a species, a family, an order, or any other group) in the NCBI taxonomy database
 
 slots:
   schema_version:
@@ -135,7 +135,7 @@ slots:
   target_organisms:
     slot_uri: EDAM:1869 # GENEPIO:0100682 maybe custom
     required: true
-    description: The organism against which this primer scheme is targeted. 
+    description: The organism against which this primer scheme is targeted.
     range: TargetOrganism
     multivalued: true
     inlined_as_list: true
@@ -196,6 +196,7 @@ slots:
     multivalued: true
     inlined_as_list: true
   algorithm:
+    description: "The algorithm (if any) used to generate this primerscheme"
     range: Algorithm
     inlined_as_list: true
   ref_selections:
