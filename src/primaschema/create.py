@@ -640,6 +640,60 @@ def update_status(
     _save_and_regenerate(info_path, ps)
 
 
+
+@modify_app.command
+def remove_target_organism(
+    info_path: Annotated[
+        pathlib.Path, Parameter(validator=validators.Path(exists=True, file_okay=True))
+    ],
+    idx: Annotated[int, Parameter(validator=validators.Number(gte=0))],
+):
+    """Remove a target organism by index."""
+    ps = PrimerScheme.model_validate_json(info_path.read_text())
+    if idx >= len(ps.target_organisms):
+        logger.warning(
+            f"Index {idx} out of range. Max index is {len(ps.target_organisms) - 1}",
+        )
+        sys.exit(1)
+    ps.target_organisms.pop(idx)
+    _save_and_regenerate(info_path, ps)
+
+
+@modify_app.command
+def add_target_organism(
+    info_path: Annotated[
+        pathlib.Path, Parameter(validator=validators.Path(exists=True, file_okay=True))
+    ],
+    target_organism: TargetOrganism,
+    idx: Annotated[None | int, Parameter(validator=validators.Number(gte=0))] = None,
+
+):
+    """Adds a target organism at a specific index."""
+    ps = PrimerScheme.model_validate_json(info_path.read_text())
+
+    # append
+    if idx is None:
+        idx = len(ps.target_organisms)
+
+    ps.target_organisms.insert(idx, target_organism) 
+    _save_and_regenerate(info_path, ps)
+
+
+@modify_app.command
+def update_algorithm(
+    info_path: Annotated[
+        pathlib.Path, Parameter(validator=validators.Path(exists=True, file_okay=True))
+    ],
+    algorithm: 
+        Algorithm,
+):
+    """Update the algorithm."""
+    ps = PrimerScheme.model_validate_json(info_path.read_text())
+    ps.algorithm = algorithm
+    _save_and_regenerate(info_path, ps)
+
+
+
 # Index commands
 @app.command
 def build_index(
@@ -725,7 +779,6 @@ def regenerate(
     ps.reference_checksum = primaschema_ref_hash(info_path.parent / REFERENCE_FILE_NAME, None)
 
     _save_and_regenerate(info_path, ps)
-
 
 
 
