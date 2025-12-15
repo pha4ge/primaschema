@@ -4,7 +4,8 @@ import linkml.validator
 
 from primaschema import SCHEMA_DIR
 from pydantic_core import from_json
-
+from primalbedtools.scheme import Scheme
+from primalbedtools.validate import validate_ref_and_bed
 
 from primaschema import (
     METADATA_FILE_NAME,
@@ -40,6 +41,29 @@ def validate_scheme_json_with_linkml(info_path: Path) -> None:
         for result in report.results:
             msg += f"{result.message}\n"
         raise ValueError(msg)
+
+
+def validate_primer_bed(infopath: Path, strict: bool = False) -> Scheme:
+    """
+    Parses the adjacent primer.bed file with PBT
+
+    :param infopath: The path to the info.json metadata file
+    :type infopath: Path
+    """
+
+    primer_path = infopath.parent / PRIMER_FILE_NAME
+    primer_txt = primer_path.read_text()
+
+    # Round trip the test
+    scheme = Scheme.from_str(primer_txt)
+    scheme.sort_bedlines()
+
+    if strict and primer_txt != scheme.to_str():
+        raise ValueError(
+            f"Change detected for {infopath}: {PRIMER_FILE_NAME} has changed order."
+        )
+
+    return scheme
 
 
 def validate_name(infopath: Path, primerscheme: PrimerScheme | None = None):
@@ -140,23 +164,35 @@ def validate(
     infopath: Path,
     primerscheme: PrimerScheme | None = None,
     additional_linkml: bool = False,
+    strict: bool = False,
 ):
-    logger.debug(f"Validating {infopath}")
+    logger.debug(f"Validating {'strict' if strict else ''} {infopath}")
     if additional_linkml:
-        logger.debug(f"Validating with LinkML: {infopath}")
+        logger.debug(f"Validated with LinkML: {infopath}")
         validate_scheme_json_with_linkml(infopath)
 
     if primerscheme is None:
         primerscheme = PrimerScheme.model_validate_json(infopath.read_text())
     validate_name(infopath, primerscheme)
+    logger.debug(f"Validated with Pydantic: {infopath}")
+
+    # Validate primer + ref
+    scheme = validate_primer_bed(infopath, strict)
+    validate_ref_and_bed(scheme.bedlines, str(infopath.parent / REFERENCE_FILE_NAME))
+    logger.debug(f"Validated primer.bed files:  {infopath}")
+
+    # Validate hashes
     validate_hashes(infopath, primerscheme)
     validate_readme(infopath, primerscheme)
+    logger.debug(f"Validated hashes and README:  {infopath}")
 
 
-def validate_all(primerschemes_repo: Path, additional_linkml: bool = False):
+def validate_all(
+    primerschemes_repo: Path, additional_linkml: bool = False, strict: bool = True
+):
     """
     Recursively searches through the primerschemes_repo for {METADATA_FILE_NAME}
     """
 
     for schemeinfo in primerschemes_repo.rglob(f"*/{METADATA_FILE_NAME}"):
-        validate(schemeinfo, None, additional_linkml)
+        validate(schemeinfo, None, additional_linkml, strict)
