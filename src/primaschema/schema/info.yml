@@ -19,16 +19,16 @@ classes:
   PrimerScheme:
     tree_root: true
     description: "A tiled amplicon PCR primer scheme definition"
-    rules:
-      - description: "Require version suffix for ref selection"
-        preconditions:
-          slot_conditions:
-            version:
-              pattern: "^v\\d+\\.\\d+\\.\\d+$" 
-        postconditions:
-          slot_conditions:
-            ref_selections:
-              maximum_cardinality: 0
+    #rules:
+    #  - description: "Require version suffix for ref selection"
+    #    preconditions:
+    #      slot_conditions:
+    #        version:
+    #          pattern: "^v\\d+\\.\\d+\\.\\d+$" 
+    #    postconditions:
+    #      slot_conditions:
+    #        ref_selections:
+    #          maximum_cardinality: 0
     slots:
       - schema_version
       - name

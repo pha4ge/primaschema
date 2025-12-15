@@ -135,11 +135,6 @@ class PrimerScheme(ConfiguredBaseModel):
     A tiled amplicon PCR primer scheme definition
     """
     linkml_meta: ClassVar[LinkMLMeta] = LinkMLMeta({'from_schema': 'https://github.com/pha4ge/primer-schemes/schemas/primer-scheme',
-         'rules': [{'description': 'Require version suffix for ref selection',
-                    'postconditions': {'slot_conditions': {'ref_selections': {'maximum_cardinality': 0,
-                                                                              'name': 'ref_selections'}}},
-                    'preconditions': {'slot_conditions': {'version': {'name': 'version',
-                                                                      'pattern': '^v\\d+\\.\\d+\\.\\d+$'}}}}],
          'tree_root': True})
 
     schema_version: str = Field(default=..., description="""The version of the schema used to create this scheme definition""", json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme']} })
