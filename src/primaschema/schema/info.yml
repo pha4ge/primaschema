@@ -72,9 +72,9 @@ classes:
         slot_uri: IAO:0000590 # A textual entity that denotes a particular in reality.
         description: "The name of the person or organisation"
         required: true
-      orcid:
+      orcid_id:
         slot_uri: IAO:0000708
-        description: "ORCID ('Open Researcher and Contributor IDentifier') of a person"
+        description: "ORCID iD ('Open Researcher and Contributor IDentifier') of a person"
       email:
         slot_uri: IAO:0000429
         description: "Contact email"

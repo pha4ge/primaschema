@@ -233,7 +233,7 @@ class Contributor(ConfiguredBaseModel):
 
     name: str = Field(default=..., description="""The name of the person or organisation""", json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme', 'Contributor', 'Algorithm'],
          'slot_uri': 'IAO:0000590'} })
-    orcid: Optional[str] = Field(default=None, description="""ORCID ('Open Researcher and Contributor IDentifier') of a person""", json_schema_extra = { "linkml_meta": {'domain_of': ['Contributor'], 'slot_uri': 'IAO:0000708'} })
+    orcid_id: Optional[str] = Field(default=None, description="""ORCID iD ('Open Researcher and Contributor IDentifier') of a person""", json_schema_extra = { "linkml_meta": {'domain_of': ['Contributor'], 'slot_uri': 'IAO:0000708'} })
     email: Optional[str] = Field(default=None, description="""Contact email""", json_schema_extra = { "linkml_meta": {'domain_of': ['Contributor'], 'slot_uri': 'IAO:0000429'} })
 
     @field_validator('email')
