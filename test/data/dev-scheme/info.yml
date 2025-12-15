@@ -1,5 +1,6 @@
 schema_version: 1.0.0a
-organism: sars-cov-2
+target_organisms:
+  - common_name: sars-cov-2
 name: artic
 amplicon_size: 400
 version: v4.1.0
@@ -8,7 +9,7 @@ aliases:
 - ARTIC/V4.1
 contributors:
 - name: ARTIC network
-  orcid: "1235678901234"
+  orcid_id: "1235678901234"
   email: a@artic.network
 vendors:
 - organisation_name: IDT

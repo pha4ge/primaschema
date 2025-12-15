@@ -1,37 +1,41 @@
 {
-  "schema_version": "1.0.0a",
-  "organism": "sars-cov-2",
-  "name": "artic",
-  "amplicon_size": 400,
-  "version": "v4.1.0",
-  "derived_from": "sars-cov-2/artic/400/v4.0.0",
-  "aliases": [
-    "ARTIC/V4.1"
-  ],
-  "contributors": [
-    {
-      "name": "ARTIC network",
-      "orcid": "1235678901234",
-      "email": "a@artic.network"
-    }
-  ],
-  "vendors": [
-    {
-      "organisation_name": "IDT",
-      "kit_name": "10011442"
-    },
-    {
-      "organisation_name": "Eurofins",
-      "home_page": "https://eurofinsgenomics.com"
-    }
-  ],
-  "definition_url": "https://github.com/pha4ge/primer-schemes/tree/main/sars-cov-2/artic/v4.1",
-  "source_url": "https://github.com/quick-lab/primerschemes/tree/main/primerschemes/artic-sars-cov-2/400/v4.1.0",
-  "citations": [
-    "https://doi.org/10.1101%2F2020.09.04.283077"
-  ],
-  "license": "CC-BY-SA-4.0",
-  "primer_checksum": "primaschema:3ef3e7bb23008684",
-  "reference_checksum": "primaschema:b1acd7163146bf17",
-  "status": "DEPRECATED"
+    "schema_version": "1.0.0a",
+    "name": "artic",
+    "amplicon_size": 400,
+    "version": "v4.1.0",
+    "contributors": [
+        {
+            "name": "ARTIC network",
+            "orcid_id": "1235678901234",
+            "email": "a@artic.network"
+        }
+    ],
+    "target_organisms": [
+        {
+            "common_name": "sars-cov-2"
+        }
+    ],
+    "aliases": [
+        "ARTIC/V4.1"
+    ],
+    "license": "CC-BY-SA-4.0",
+    "status": "DEPRECATED",
+    "derived_from": "sars-cov-2/artic/400/v4.0.0",
+    "citations": [
+        "https://doi.org/10.1101%2F2020.09.04.283077"
+    ],
+    "vendors": [
+        {
+            "organisation_name": "IDT",
+            "kit_name": "10011442"
+        },
+        {
+            "organisation_name": "Eurofins",
+            "home_page": "https://eurofinsgenomics.com"
+        }
+    ],
+    "primer_checksum": "primaschema:bed:b7d72771fcfa8a34",
+    "primer_file_sha256": "6640cd47ce429efbf074d646f002ff495939934121dfb2dd78a925da2d1e6036",
+    "reference_checksum": "primaschema:ref:21c16fc69acb3b9e",
+    "reference_file_sha256": "b74b271645e893a879172021e14db7133dba85724cb1907a92628a359cb732ba"
 }
