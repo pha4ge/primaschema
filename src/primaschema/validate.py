@@ -145,8 +145,6 @@ def validate(
     if additional_linkml:
         logger.debug(f"Validating with LinkML: {infopath}")
         validate_scheme_json_with_linkml(infopath)
-    
-
 
     if primerscheme is None:
         primerscheme = PrimerScheme.model_validate_json(infopath.read_text())

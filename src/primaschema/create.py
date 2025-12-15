@@ -5,6 +5,9 @@ from primaschema.schema.info import (
     SchemeLicense,
     SchemeStatus,
     SchemeTag,
+    Algorithm,
+    TargetOrganism,
+    version as SCHEMA_VERSION,
 )
 from typing import Annotated, Any, List, Optional
 import json
@@ -15,11 +18,11 @@ from primalbedtools.validate import validate
 from primalbedtools.bedfiles import BedLineParser, sort_bedlines
 
 from cyclopts import App, Parameter, validators
-from pydantic import BeforeValidator, model_validator
+from pydantic import BeforeValidator, model_validator, field_validator
 
 from rich.console import Console
 from rich.traceback import install as install_rich_traceback
-from primaschema import METADATA_FILE_NAME, logger
+from primaschema import METADATA_FILE_NAME, logger, PRIMER_FILE_NAME
 from primaschema.schema.manifest import (
     PrimerSchemeIndex,
     ManifestPrimerScheme,
@@ -28,6 +31,8 @@ from primaschema.schema.manifest import (
 from primaschema.cli import configure_logging
 from primaschema.util import sha256_checksum, find_all_info_json
 from primaschema.validate import validate_all
+from primaschema.lib import plot_primers
+
 
 LICENSE_TXT_CC_BY_SA_4_0 = """\n\n------------------------------------------------------------------------
 
@@ -50,9 +55,6 @@ app = App(
 )
 modify_app = App(name="modify")
 app.command(modify_app)
-
-index_app = App(name="index")
-app.command(index_app)
 
 validate_app = App(name="validate")
 app.command(validate_app)
@@ -135,16 +137,22 @@ def parse_vendor_single(v: Any) -> Vendor:
     raise ValueError(f"Cannot parse vendor: {v}")
 
 
-def _save_and_regenerate(info_path: pathlib.Path, ps: PrimerScheme):
+def _save_and_regenerate(
+    info_path: pathlib.Path, ps: PrimerScheme, regenerate_plot: bool = False
+):
     """Saves the PrimerScheme to info.json and regenerates the README."""
     # Save info.json
     with open(info_path, "w") as f:
-        f.write(ps.model_dump_json(exclude_unset=True, exclude_none=True, indent=1))
+        f.write(ps.model_dump_json(exclude_unset=True, exclude_none=True, indent=4))
 
     # Regenerate README
     scheme_dir = info_path.parent
-    generate_readme(scheme_dir, ps, [])
-    print(f"Updated {info_path} and regenerated README.md")
+    generate_readme(scheme_dir, ps)
+    logger.debug(f"Scheme saved and regenerated README.md ({info_path})")
+
+    if regenerate_plot:
+        (scheme_dir / "work").mkdir(exist_ok=True)
+        plot_primers(scheme_dir / PRIMER_FILE_NAME, scheme_dir / "work" / "primer.svg")
 
 
 def create_status_badge(primerscheme: PrimerScheme) -> str:
@@ -162,9 +170,7 @@ def create_status_badge(primerscheme: PrimerScheme) -> str:
     return f"[![Generic badge](https://img.shields.io/badge/STATUS-{primerscheme.status}-{color}.svg)]"
 
 
-def generate_readme(
-    path: pathlib.Path, primerscheme: PrimerScheme, pngs: list[pathlib.Path]
-):
+def generate_readme(path: pathlib.Path, primerscheme: PrimerScheme):
     """
     Generate the README.md file for a scheme
 
@@ -198,7 +204,14 @@ def generate_readme(
                 readme.write(note + "\n\n")
 
         readme.write("## Metadata\n\n")
-        readme.write(f"**Organism:** {primerscheme.organism}\n\n")
+        if primerscheme.target_organisms:
+            readme.write("**Target Organisms:**\n")
+            for to in primerscheme.target_organisms:
+                to_str = f"- {to.common_name or ''}"
+                if to.ncbi_tax_id:
+                    to_str += f" (Tax ID: {to.ncbi_tax_id})"
+                readme.write(f"{to_str}\n")
+            readme.write("\n")
 
         if primerscheme.derived_from:
             readme.write(f"**Derived from:** {primerscheme.derived_from}\n\n")
@@ -228,10 +241,10 @@ def generate_readme(
                 readme.write(f"{vendor_str}\n")
             readme.write("\n")
 
-        if pngs:
-            readme.write("## Overviews\n\n")
-            for png in pngs:
-                readme.write(f"![{png.name}](work/{png.name})\n\n")
+        readme.write("## Overviews\n\n")
+        readme.write(
+            '<div style="width: 100%;"><img src="work/primer.svg" style="width: 100%;" alt="Click to see the source"></div>\n\n'
+        )
 
         readme.write("## Details\n\n")
 
@@ -244,15 +257,97 @@ def generate_readme(
             readme.write(LICENSE_TXT_CC_BY_SA_4_0)
 
 
+def parse_algorithm(v: Any) -> Optional[Algorithm]:
+    if v is None:
+        return None
+    if isinstance(v, Algorithm):
+        return v
+    if isinstance(v, dict):
+        return Algorithm(**v)
+    if isinstance(v, str):
+        if ":" in v:
+            name, version = v.split(":", 1)
+            return Algorithm(name=name, version=version)
+        return Algorithm(name=v)
+    raise ValueError(f"Cannot parse algorithm: {v}")
+
+
+def parse_target_organism_single(v: Any) -> TargetOrganism:
+    if isinstance(v, TargetOrganism):
+        return v
+    if isinstance(v, dict):
+        return TargetOrganism(**v)
+    if isinstance(v, str):
+        # Try JSON first
+        try:
+            data = json.loads(v)
+            if isinstance(data, dict):
+                return TargetOrganism(**data)
+        except json.JSONDecodeError:
+            pass
+
+        # Key-value parsing
+        if "=" in v:
+            parts = {}
+            for part in v.split(","):
+                if "=" in part:
+                    key, val = part.split("=", 1)
+                    parts[key.strip()] = val.strip()
+            return TargetOrganism(**parts)
+
+        # If it looks like an int, assume it's a tax id
+        if v.isdigit():
+            return TargetOrganism(ncbi_tax_id=v)
+
+        # Otherwise assume common name
+        return TargetOrganism(common_name=v)
+    raise ValueError(f"Cannot parse target organism: {v}")
+
+
+def parse_target_organisms_pydantic(v: Any) -> List[TargetOrganism]:
+    if isinstance(v, list):
+        return [parse_target_organism_single(x) for x in v]
+    if isinstance(v, (str, dict, TargetOrganism)):
+        return [parse_target_organism_single(v)]
+    return v
+
+
+def parse_vendors_pydantic(v: Any) -> Optional[List[Vendor]]:
+    if v is None:
+        return None
+    if isinstance(v, list):
+        return [parse_vendor_single(x) for x in v]
+    if isinstance(v, (str, dict, Vendor)):
+        return [parse_vendor_single(v)]
+    return v
+
+
 class CLIPrimerScheme(PrimerScheme):
+    schema_version: Annotated[str, Parameter(parse=False)] = SCHEMA_VERSION
     contributors: Annotated[
         List[Contributor], BeforeValidator(parse_contributors_pydantic)
     ]
+    target_organisms: Annotated[
+        List[TargetOrganism], BeforeValidator(parse_target_organisms_pydantic)
+    ]
+    vendors: Annotated[
+        Optional[List[Vendor]], BeforeValidator(parse_vendors_pydantic)
+    ] = None
+    algorithm: Annotated[Optional[Algorithm], Parameter(parse=False)] = None
     # Don't expose the checksums to cli
     primer_checksum: Annotated[str | None, Parameter(parse=False)] = None
     primer_file_sha256: Annotated[str | None, Parameter(parse=False)] = None
     reference_checksum: Annotated[str | None, Parameter(parse=False)] = None
     reference_file_sha256: Annotated[str | None, Parameter(parse=False)] = None
+
+    @field_validator("target_organisms")
+    def validate_target_organisms(cls, v):
+        for to in v:
+            if not to.common_name and not to.ncbi_tax_id:
+                raise ValueError(
+                    "TargetOrganism must have at least one of 'common_name' or 'ncbi_tax_id'"
+                )
+        return v
 
     @model_validator(mode="before")
     @classmethod
@@ -302,7 +397,17 @@ def create(
             help="The path to the primerschemes directory. Will use the ENV VAR PRIMER_SCHEMES_PATH",
         ),
     ],
+    algorithm: Annotated[
+        Optional[str],
+        Parameter(
+            help="The algorithm used to generate the scheme (e.g. primalscheme:3.0.3)"
+        ),
+    ] = None,
 ):
+    # Parse algorithm if provided
+    if algorithm:
+        cli_ps.algorithm = parse_algorithm(algorithm)
+
     # Convert to base PrimerScheme to ensure strict adherence to the schema
     ps = PrimerScheme.model_validate(cli_ps.model_dump())
 
@@ -333,12 +438,7 @@ def create(
     # TODO add primaschema hashes
 
     # Write info.json
-    with open(output_dir / METADATA_FILE_NAME, "w") as f:
-        data = ps.model_dump_json(exclude_unset=True, exclude_none=True, indent=1)
-        f.write(data)
-
-    # Write the readme
-    generate_readme(output_dir, ps, [])  # TODO auto generate pngs for the scheme
+    _save_and_regenerate(output_dir / METADATA_FILE_NAME, ps, True)
 
 
 @modify_app.command
@@ -538,7 +638,7 @@ def build_index(
     base_url: str = "",
 ):
     # Set up logging
-    configure_logging(debug=True)
+    configure_logging(debug=False)
 
     # Read in current manifest
     if manifest_path is not None:
@@ -577,4 +677,8 @@ def all(
     validate_all(primer_schemes_path, additional_linkml)
 
 
-app()
+
+
+
+if __name__ == "__main__":
+    app()
