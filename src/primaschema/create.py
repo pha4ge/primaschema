@@ -9,27 +9,33 @@ from primaschema.schema.info import (
     TargetOrganism,
     version as SCHEMA_VERSION,
 )
+import tempfile
 from typing import Annotated, Any, List, Optional
 import json
 import pathlib
 import shutil
 import sys
-from primalbedtools.validate import validate
+from primalbedtools.validate import validate_ref_and_bed
 from primalbedtools.bedfiles import BedLineParser, sort_bedlines
-
+from Bio import SeqIO
 from cyclopts import App, Parameter, validators
 from pydantic import BeforeValidator, model_validator, field_validator
 
 from rich.console import Console
 from rich.traceback import install as install_rich_traceback
-from primaschema import METADATA_FILE_NAME, logger, PRIMER_FILE_NAME
+from primaschema import (
+    METADATA_FILE_NAME,
+    logger,
+    PRIMER_FILE_NAME,
+    REFERENCE_FILE_NAME,
+)
 from primaschema.schema.manifest import (
     PrimerSchemeIndex,
     ManifestPrimerScheme,
     update_index,
 )
 from primaschema.cli import configure_logging
-from primaschema.util import sha256_checksum, find_all_info_json
+from primaschema.util import sha256_checksum, find_all_info_json, primaschema_bed_hash, primaschema_ref_hash
 from primaschema.validate import validate_all
 from primaschema.lib import plot_primers
 
@@ -324,10 +330,10 @@ def parse_vendors_pydantic(v: Any) -> Optional[List[Vendor]]:
 
 class CLIPrimerScheme(PrimerScheme):
     schema_version: Annotated[str, Parameter(parse=False)] = SCHEMA_VERSION
-    contributors: Annotated[
+    contributors: Annotated[  # type: ignore
         List[Contributor], BeforeValidator(parse_contributors_pydantic)
     ]
-    target_organisms: Annotated[
+    target_organisms: Annotated[  # type: ignore
         List[TargetOrganism], BeforeValidator(parse_target_organisms_pydantic)
     ]
     vendors: Annotated[
@@ -410,9 +416,8 @@ def create(
 
     # Convert to base PrimerScheme to ensure strict adherence to the schema
     ps = PrimerScheme.model_validate(cli_ps.model_dump())
-
-    # Validate the bed and ref files files
-    validate(str(bed_path), str(reference_path.absolute()))
+    _headers, bedlines = BedLineParser.from_file(str(bed_path))
+    bedlines = sort_bedlines(bedlines)
 
     # Create a directory to store the new scheme in.
     output_dir = primer_schemes_path / ps.name / str(ps.amplicon_size) / ps.version
@@ -420,25 +425,37 @@ def create(
         print(f"Output directory already exists: {output_dir}", file=sys.stderr)
         raise ValueError(f"Output directory already exists: {output_dir}")
 
-    output_dir.mkdir(parents=True)
-    output_bed = output_dir / "primer.bed"
-    output_ref = output_dir / "reference.fasta"
+    # Use a tmp dir to ensure atomic
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_path = pathlib.Path(tmp_dir)
+        tmp_version_level = tmp_path / ps.version
+        tmp_version_level.mkdir()
 
-    # Move / Write the bedfile
-    _headers, bedlines = BedLineParser.from_file(str(bed_path))
-    bedlines = sort_bedlines(bedlines)
-    BedLineParser.to_file(output_bed, _headers, bedlines)
-    # Copy ref
-    shutil.copy(reference_path, output_ref)
+        # Move / Write the bedfile
+        BedLineParser.to_file(tmp_version_level / PRIMER_FILE_NAME, _headers, bedlines)
+        # Parse ref
+        reference_records = list(SeqIO.parse(reference_path, "fasta"))
+        with open(tmp_version_level / REFERENCE_FILE_NAME, "w") as ref_file:
+            SeqIO.write(reference_records, ref_file, "fasta")
+        # Validate the bed and ref files files
+        validate_ref_and_bed(
+            bedlines, str((tmp_version_level / REFERENCE_FILE_NAME).absolute())
+        )
 
-    # Generate hashes of the files
-    ps.primer_file_sha256 = sha256_checksum(output_bed)
-    ps.reference_file_sha256 = sha256_checksum(output_ref)
+        # Generate hashes of the files
+        ps.primer_file_sha256 = sha256_checksum(tmp_version_level / PRIMER_FILE_NAME)
+        ps.reference_file_sha256 = sha256_checksum(
+            tmp_version_level / REFERENCE_FILE_NAME
+        )
 
-    # TODO add primaschema hashes
+        # add primaschema hashes
+        ps.primer_checksum = primaschema_bed_hash(None, bedlines)
+        ps.reference_checksum = primaschema_ref_hash(None, reference_records)
 
-    # Write info.json
-    _save_and_regenerate(output_dir / METADATA_FILE_NAME, ps, True)
+        # Write info.json to tmp
+        _save_and_regenerate(tmp_version_level / METADATA_FILE_NAME, ps, True)
+        # if all valid copy the tmp_version_level to output_dir
+        shutil.copytree(tmp_version_level, output_dir)
 
 
 @modify_app.command
@@ -672,10 +689,42 @@ def all(
         ),
     ],
     additional_linkml: bool = False,
+    strict: bool = True,
 ):
     configure_logging(debug=True)
-    validate_all(primer_schemes_path, additional_linkml)
+    validate_all(primer_schemes_path, additional_linkml, strict)
 
+
+@app.command
+def regenerate(
+    info_path: Annotated[
+        pathlib.Path, Parameter(validator=validators.Path(exists=True, file_okay=True))
+    ],
+    reformat_primer_bed: bool = False,
+):
+    """
+    Regenerates the metadata.
+    - (optionally) reformats the primer.bed file
+    - updates hashes
+    - updates readme
+    """
+    ps = PrimerScheme.model_validate_json(info_path.read_text())
+    _h, bls = BedLineParser.from_file(info_path.parent / PRIMER_FILE_NAME)
+
+    # Read in the primer.bed
+    if reformat_primer_bed:
+        bls = sort_bedlines(bls)
+        BedLineParser.to_file(info_path.parent / PRIMER_FILE_NAME, _h, bls)
+
+    validate_ref_and_bed(bls, str((info_path.parent / REFERENCE_FILE_NAME).absolute()))
+
+    # Regenerate the hashes
+    ps.primer_file_sha256 = sha256_checksum(info_path.parent / PRIMER_FILE_NAME)
+    ps.reference_file_sha256 = sha256_checksum(info_path.parent / REFERENCE_FILE_NAME)
+    ps.primer_checksum = primaschema_bed_hash(None, bls)
+    ps.reference_checksum = primaschema_ref_hash(info_path.parent / REFERENCE_FILE_NAME, None)
+
+    _save_and_regenerate(info_path, ps)
 
 
 

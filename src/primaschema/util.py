@@ -4,12 +4,13 @@ import tarfile
 
 from io import BytesIO
 from pathlib import Path
-
+from Bio import SeqIO, SeqRecord
 import httpx
 from hashlib import sha256
-from . import logger
+from primalbedtools.bedfiles import BedLine, BedLineParser, sort_bedlines
+from primalbedtools.scheme import Scheme
 
-from primaschema import METADATA_FILE_NAME
+from primaschema import METADATA_FILE_NAME, logger
 
 
 def run(cmd, cwd="./"):  # Helper for CLI testing
@@ -71,5 +72,58 @@ def sha256_checksum(filename: Path):
     return sha256_hasher.hexdigest()
 
 
+def primaschema_bed_hash(
+    bedfile_path: Path | None = None, bedlines: list[BedLine] | None = None
+) -> str:
+    if bedfile_path is None and bedlines is None:
+        raise ValueError("Please provide either an path or BedLines to hash")
+
+    if bedlines is None and bedfile_path is not None:
+        _h, bedlines  = BedLineParser.from_file(bedfile_path)
+
+    assert bedlines is not None
+    s_bedlines = sort_bedlines(bedlines) 
+    hasher = sha256()
+    # extract wanted fields
+    for sbedline in s_bedlines:
+        hasher.update(
+            "\t".join(
+                [
+                    sbedline.chrom,
+                    str(sbedline.start),
+                    str(sbedline.end),
+                    str(sbedline.pool),
+                    sbedline.strand,
+                    sbedline.sequence,
+                ]
+            ).encode()
+        )
+    # return truncated hash
+    return f"primaschema:bed:{hasher.hexdigest()[:16]}"
+
+def primaschema_ref_hash(
+    ref_path: Path | None = None, seq_records: list | None = None,
+) -> str:
+    if ref_path is None and seq_records is None:
+        raise ValueError("Please provide either an path or SeqRecords to hash")
+
+    if seq_records is None:
+        seq_records = list(SeqIO.parse(ref_path, "fasta"))
+
+    # Sort by id
+    seq_records.sort(key=lambda x: x.id)
+
+    hasher = sha256()   
+    for record in seq_records: 
+        hasher.update(record.id.strip().upper().encode()) 
+        hasher.update(str(record.seq.upper()).encode())
+
+    # return truncated hash
+    return f"primaschema:ref:{hasher.hexdigest()[:16]}"
+
+
+
 def find_all_info_json(primerschemes_repo: Path):
     return list(primerschemes_repo.rglob(f"*/{METADATA_FILE_NAME}"))
+
+
