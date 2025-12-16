@@ -42,6 +42,7 @@ dependencies = [
 
 [project.scripts]
 primaschema = "primaschema.cli:main"
+new = "primaschema.create:app"
 
 [project.urls]
 Home = "https://github.com/pha4ge/primaschema"
@@ -62,5 +63,5 @@ filterwarnings = [
     "ignore::pydantic.warnings.PydanticDeprecatedSince211:linkml.generators.*",
 ]
 
-[tool.ruff.format]
-exclude = ["info.py"]
+[tool.ruff]
+exclude = ["src/primaschema/schema/info.py"]
