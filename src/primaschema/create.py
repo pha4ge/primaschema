@@ -1,44 +1,50 @@
-from primaschema.schema.info import (
-    PrimerScheme,
-    Vendor,
-    Contributor,
-    SchemeLicense,
-    SchemeStatus,
-    SchemeTag,
-    Algorithm,
-    TargetOrganism,
-    version as SCHEMA_VERSION,
-)
-import tempfile
-from typing import Annotated, Any, List, Optional
 import json
 import pathlib
 import shutil
 import sys
-from primalbedtools.validate import validate_ref_and_bed
-from primalbedtools.bedfiles import BedLineParser, sort_bedlines
+import tempfile
+from typing import Annotated, Any, List, Optional
+
 from Bio import SeqIO
 from cyclopts import App, Parameter, validators
-from pydantic import BeforeValidator, model_validator, field_validator
-
+from primalbedtools.bedfiles import BedLineParser, sort_bedlines
+from primalbedtools.validate import validate_ref_and_bed
+from pydantic import BeforeValidator, field_validator, model_validator
 from rich.console import Console
 from rich.traceback import install as install_rich_traceback
+
 from primaschema import (
     METADATA_FILE_NAME,
-    logger,
     PRIMER_FILE_NAME,
     REFERENCE_FILE_NAME,
+    logger,
+)
+from primaschema.cli import configure_logging
+from primaschema.lib import plot_primers
+from primaschema.schema.info import (
+    Algorithm,
+    Contributor,
+    PrimerScheme,
+    SchemeLicense,
+    SchemeStatus,
+    SchemeTag,
+    TargetOrganism,
+    Vendor,
+)
+from primaschema.schema.info import (
+    version as SCHEMA_VERSION,
 )
 from primaschema.schema.manifest import (
     PrimerSchemeIndex,
-    ManifestPrimerScheme,
     update_index,
 )
-from primaschema.cli import configure_logging
-from primaschema.util import sha256_checksum, find_all_info_json, primaschema_bed_hash, primaschema_ref_hash
+from primaschema.util import (
+    find_all_info_json,
+    primaschema_bed_hash,
+    primaschema_ref_hash,
+    sha256_checksum,
+)
 from primaschema.validate import validate_all
-from primaschema.lib import plot_primers
-
 
 LICENSE_TXT_CC_BY_SA_4_0 = """\n\n------------------------------------------------------------------------
 
@@ -575,9 +581,8 @@ def update_vendor(
     """Update a vendor at a specific index."""
     ps = PrimerScheme.model_validate_json(info_path.read_text())
     if not ps.vendors or idx >= len(ps.vendors):
-        print(
+        logger.warning(
             f"Index {idx} out of range.",
-            file=sys.stderr,
         )
         sys.exit(1)
     ps.vendors[idx] = vendor
@@ -640,7 +645,6 @@ def update_status(
     _save_and_regenerate(info_path, ps)
 
 
-
 @modify_app.command
 def remove_target_organism(
     info_path: Annotated[
@@ -664,9 +668,8 @@ def add_target_organism(
     info_path: Annotated[
         pathlib.Path, Parameter(validator=validators.Path(exists=True, file_okay=True))
     ],
-    target_organism: TargetOrganism,
+    target_organism: Annotated[TargetOrganism, Parameter(name="*")],
     idx: Annotated[None | int, Parameter(validator=validators.Number(gte=0))] = None,
-
 ):
     """Adds a target organism at a specific index."""
     ps = PrimerScheme.model_validate_json(info_path.read_text())
@@ -675,7 +678,7 @@ def add_target_organism(
     if idx is None:
         idx = len(ps.target_organisms)
 
-    ps.target_organisms.insert(idx, target_organism) 
+    ps.target_organisms.insert(idx, target_organism)
     _save_and_regenerate(info_path, ps)
 
 
@@ -684,14 +687,12 @@ def update_algorithm(
     info_path: Annotated[
         pathlib.Path, Parameter(validator=validators.Path(exists=True, file_okay=True))
     ],
-    algorithm: 
-        Algorithm,
+    algorithm: Algorithm,
 ):
     """Update the algorithm."""
     ps = PrimerScheme.model_validate_json(info_path.read_text())
     ps.algorithm = algorithm
     _save_and_regenerate(info_path, ps)
-
 
 
 # Index commands
@@ -776,10 +777,11 @@ def regenerate(
     ps.primer_file_sha256 = sha256_checksum(info_path.parent / PRIMER_FILE_NAME)
     ps.reference_file_sha256 = sha256_checksum(info_path.parent / REFERENCE_FILE_NAME)
     ps.primer_checksum = primaschema_bed_hash(None, bls)
-    ps.reference_checksum = primaschema_ref_hash(info_path.parent / REFERENCE_FILE_NAME, None)
+    ps.reference_checksum = primaschema_ref_hash(
+        info_path.parent / REFERENCE_FILE_NAME, None
+    )
 
     _save_and_regenerate(info_path, ps)
-
 
 
 if __name__ == "__main__":

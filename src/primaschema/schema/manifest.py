@@ -1,16 +1,17 @@
-from typing import Any, Literal, cast, Optional
-from pydantic import Field, create_model, field_validator, computed_field, BaseModel
+from typing import Optional
+
+from pydantic import BaseModel, Field, computed_field
+
+from primaschema import METADATA_FILE_NAME, PRIMER_FILE_NAME, REFERENCE_FILE_NAME
 from primaschema.schema.info import (
     ConfiguredBaseModel,
-    PrimerScheme,
     Contributor,
+    PrimerScheme,
     SchemeLicense,
-    SchemeTag,
     SchemeStatus,
+    SchemeTag,
     TargetOrganism,
 )
-
-from primaschema import PRIMER_FILE_NAME, REFERENCE_FILE_NAME, METADATA_FILE_NAME
 
 
 class ManifestPrimerScheme(BaseModel):

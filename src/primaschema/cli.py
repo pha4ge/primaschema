@@ -1,6 +1,5 @@
-import sys
 import logging
-
+import sys
 from pathlib import Path
 
 import defopt

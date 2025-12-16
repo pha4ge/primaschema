@@ -1,35 +1,29 @@
 import hashlib
+import json
 import re
 import shutil
 import sys
-
 from collections import defaultdict
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from typing import Literal, Optional, Dict, Tuple
-
-import linkml.validator
-import yaml
+from typing import Dict, Literal, Optional, Tuple
 
 import altair as alt
+import linkml.validator
 import pandas as pd
-
+import yaml
 from Bio import SeqIO
-
 from linkml.generators.pydanticgen import PydanticGenerator
 
 from primaschema import (
-    logger,
-    MANIFEST_HEADER_PATH,
     CACHE_DIR,
+    MANIFEST_HEADER_PATH,
     SCHEMA_DIR,
     SCHEMES_ARCHIVE_URL,
+    logger,
+    util,
 )
-
 from primaschema.schema import bed, info
-from primaschema import util
-import json
-
 
 SCHEME_BED_FIELDS = ["chrom", "chromStart", "chromEnd", "name", "poolName", "strand"]
 PRIMER_BED_FIELDS = SCHEME_BED_FIELDS + ["sequence"]
@@ -620,7 +614,7 @@ def plot_primers(bed_path: Path, out_path: Path = Path("primer.html")) -> None:
     )
 
     combined_chart.interactive().save(str(out_path))
-    logger.info(f"Plot saved ({out_path})")
+    logger.debug(f"Plot saved ({out_path})")
 
 
 def subset(scheme_dir: Path, chrom: str, out_dir: Path = Path("built")) -> None:
