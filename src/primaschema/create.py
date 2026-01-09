@@ -48,14 +48,16 @@ from primaschema.validate import validate_all
 
 LICENSE_TXT_CC_BY_SA_4_0 = """\n\n------------------------------------------------------------------------
 
-This work is licensed under a [Creative Commons Attribution-ShareAlike 4.0 International License](http://creativecommons.org/licenses/by-sa/4.0/) 
+This work is licensed under a [Creative Commons Attribution-ShareAlike 4.0 International License](http://creativecommons.org/licenses/by-sa/4.0/)
 
 ![](https://i.creativecommons.org/l/by-sa/4.0/88x31.png)"""
 
 # Patch PrimerScheme to fix cyclopts issue with string defaults for Enums
 # See https://github.com/pha4ge/primaschema/issues/new
 if PrimerScheme.model_fields["license"].default == "CC-BY-SA-4.0":
-    PrimerScheme.model_fields["license"].default = SchemeLicense.CC_BY_SA_4FULL_STOP0
+    PrimerScheme.model_fields[
+        "license"
+    ].default = SchemeLicense.CC_BY_SA_4FULL_STOP0
 
 # Add rich formatted errors
 error_console = Console(stderr=True)
@@ -63,7 +65,9 @@ install_rich_traceback(console=error_console)
 
 # Create the apps
 app = App(
-    name="primaschema", version_flags="--show-version", error_console=error_console
+    name="primaschema",
+    version_flags="--show-version",
+    error_console=error_console,
 )
 modify_app = App(name="modify")
 app.command(modify_app)
@@ -155,7 +159,9 @@ def _save_and_regenerate(
     """Saves the PrimerScheme to info.json and regenerates the README."""
     # Save info.json
     with open(info_path, "w") as f:
-        f.write(ps.model_dump_json(exclude_unset=True, exclude_none=True, indent=4))
+        f.write(
+            ps.model_dump_json(exclude_unset=True, exclude_none=True, indent=4)
+        )
 
     # Regenerate README
     scheme_dir = info_path.parent
@@ -164,7 +170,9 @@ def _save_and_regenerate(
 
     if regenerate_plot:
         (scheme_dir / "work").mkdir(exist_ok=True)
-        plot_primers(scheme_dir / PRIMER_FILE_NAME, scheme_dir / "work" / "primer.svg")
+        plot_primers(
+            scheme_dir / PRIMER_FILE_NAME, scheme_dir / "work" / "primer.svg"
+        )
 
 
 def create_status_badge(primerscheme: PrimerScheme) -> str:
@@ -405,7 +413,9 @@ def create(
         pathlib.Path,
         Parameter(
             env_var="PRIMER_SCHEMES_PATH",
-            validator=validators.Path(exists=True, dir_okay=True, file_okay=False),
+            validator=validators.Path(
+                exists=True, dir_okay=True, file_okay=False
+            ),
             help="The path to the primerschemes directory. Will use the ENV VAR PRIMER_SCHEMES_PATH",
         ),
     ],
@@ -426,7 +436,9 @@ def create(
     bedlines = sort_bedlines(bedlines)
 
     # Create a directory to store the new scheme in.
-    output_dir = primer_schemes_path / ps.name / str(ps.amplicon_size) / ps.version
+    output_dir = (
+        primer_schemes_path / ps.name / str(ps.amplicon_size) / ps.version
+    )
     if output_dir.exists():
         print(f"Output directory already exists: {output_dir}", file=sys.stderr)
         raise ValueError(f"Output directory already exists: {output_dir}")
@@ -438,7 +450,9 @@ def create(
         tmp_version_level.mkdir()
 
         # Move / Write the bedfile
-        BedLineParser.to_file(tmp_version_level / PRIMER_FILE_NAME, _headers, bedlines)
+        BedLineParser.to_file(
+            tmp_version_level / PRIMER_FILE_NAME, _headers, bedlines
+        )
         # Parse ref
         reference_records = list(SeqIO.parse(reference_path, "fasta"))
         with open(tmp_version_level / REFERENCE_FILE_NAME, "w") as ref_file:
@@ -449,7 +463,9 @@ def create(
         )
 
         # Generate hashes of the files
-        ps.primer_file_sha256 = sha256_checksum(tmp_version_level / PRIMER_FILE_NAME)
+        ps.primer_file_sha256 = sha256_checksum(
+            tmp_version_level / PRIMER_FILE_NAME
+        )
         ps.reference_file_sha256 = sha256_checksum(
             tmp_version_level / REFERENCE_FILE_NAME
         )
@@ -467,13 +483,16 @@ def create(
 @modify_app.command
 def add_contributor(
     info_path: Annotated[
-        pathlib.Path, Parameter(validator=validators.Path(exists=True, file_okay=True))
+        pathlib.Path,
+        Parameter(validator=validators.Path(exists=True, file_okay=True)),
     ],
     contributor: Annotated[
         Contributor,
         Parameter(name="*", converter=parse_contributor_single),
     ],
-    idx: Annotated[None | int, Parameter(validator=validators.Number(gte=0))] = None,
+    idx: Annotated[
+        None | int, Parameter(validator=validators.Number(gte=0))
+    ] = None,
 ):
     """Add a contributor to the scheme."""
     ps = PrimerScheme.model_validate_json(info_path.read_text())
@@ -487,7 +506,8 @@ def add_contributor(
 @modify_app.command
 def remove_contributor(
     info_path: Annotated[
-        pathlib.Path, Parameter(validator=validators.Path(exists=True, file_okay=True))
+        pathlib.Path,
+        Parameter(validator=validators.Path(exists=True, file_okay=True)),
     ],
     idx: Annotated[int, Parameter(validator=validators.Number(gte=0))],
 ):
@@ -506,7 +526,8 @@ def remove_contributor(
 @modify_app.command
 def update_contributor(
     info_path: Annotated[
-        pathlib.Path, Parameter(validator=validators.Path(exists=True, file_okay=True))
+        pathlib.Path,
+        Parameter(validator=validators.Path(exists=True, file_okay=True)),
     ],
     idx: Annotated[int, Parameter(validator=validators.Number(gte=0))],
     contributor: Annotated[
@@ -529,13 +550,16 @@ def update_contributor(
 @modify_app.command
 def add_vendor(
     info_path: Annotated[
-        pathlib.Path, Parameter(validator=validators.Path(exists=True, file_okay=True))
+        pathlib.Path,
+        Parameter(validator=validators.Path(exists=True, file_okay=True)),
     ],
     vendor: Annotated[
         Vendor,
         Parameter(name="*", converter=parse_vendor_single),
     ],
-    idx: Annotated[None | int, Parameter(validator=validators.Number(gte=0))] = None,
+    idx: Annotated[
+        None | int, Parameter(validator=validators.Number(gte=0))
+    ] = None,
 ):
     """Add a vendor to the scheme."""
     ps = PrimerScheme.model_validate_json(info_path.read_text())
@@ -551,7 +575,8 @@ def add_vendor(
 @modify_app.command
 def remove_vendor(
     info_path: Annotated[
-        pathlib.Path, Parameter(validator=validators.Path(exists=True, file_okay=True))
+        pathlib.Path,
+        Parameter(validator=validators.Path(exists=True, file_okay=True)),
     ],
     idx: Annotated[int, Parameter(validator=validators.Number(gte=0))],
 ):
@@ -570,7 +595,8 @@ def remove_vendor(
 @modify_app.command
 def update_vendor(
     info_path: Annotated[
-        pathlib.Path, Parameter(validator=validators.Path(exists=True, file_okay=True))
+        pathlib.Path,
+        Parameter(validator=validators.Path(exists=True, file_okay=True)),
     ],
     idx: Annotated[int, Parameter(validator=validators.Number(gte=0))],
     vendor: Annotated[
@@ -592,7 +618,8 @@ def update_vendor(
 @modify_app.command
 def add_tag(
     info_path: Annotated[
-        pathlib.Path, Parameter(validator=validators.Path(exists=True, file_okay=True))
+        pathlib.Path,
+        Parameter(validator=validators.Path(exists=True, file_okay=True)),
     ],
     tag: SchemeTag,
 ):
@@ -608,7 +635,8 @@ def add_tag(
 @modify_app.command
 def remove_tag(
     info_path: Annotated[
-        pathlib.Path, Parameter(validator=validators.Path(exists=True, file_okay=True))
+        pathlib.Path,
+        Parameter(validator=validators.Path(exists=True, file_okay=True)),
     ],
     tag: SchemeTag,
 ):
@@ -622,7 +650,8 @@ def remove_tag(
 @modify_app.command
 def update_license(
     info_path: Annotated[
-        pathlib.Path, Parameter(validator=validators.Path(exists=True, file_okay=True))
+        pathlib.Path,
+        Parameter(validator=validators.Path(exists=True, file_okay=True)),
     ],
     license: SchemeLicense,
 ):
@@ -635,7 +664,8 @@ def update_license(
 @modify_app.command
 def update_status(
     info_path: Annotated[
-        pathlib.Path, Parameter(validator=validators.Path(exists=True, file_okay=True))
+        pathlib.Path,
+        Parameter(validator=validators.Path(exists=True, file_okay=True)),
     ],
     status: SchemeStatus,
 ):
@@ -648,7 +678,8 @@ def update_status(
 @modify_app.command
 def remove_target_organism(
     info_path: Annotated[
-        pathlib.Path, Parameter(validator=validators.Path(exists=True, file_okay=True))
+        pathlib.Path,
+        Parameter(validator=validators.Path(exists=True, file_okay=True)),
     ],
     idx: Annotated[int, Parameter(validator=validators.Number(gte=0))],
 ):
@@ -666,12 +697,20 @@ def remove_target_organism(
 @modify_app.command
 def add_target_organism(
     info_path: Annotated[
-        pathlib.Path, Parameter(validator=validators.Path(exists=True, file_okay=True))
+        pathlib.Path,
+        Parameter(validator=validators.Path(exists=True, file_okay=True)),
     ],
-    target_organism: Annotated[TargetOrganism, Parameter(name="*")],
-    idx: Annotated[None | int, Parameter(validator=validators.Number(gte=0))] = None,
+    target_organism: Annotated[
+        Optional[TargetOrganism], Parameter(name="*")
+    ] = None,
+    idx: Annotated[
+        None | int, Parameter(validator=validators.Number(gte=0))
+    ] = None,
 ):
     """Adds a target organism at a specific index."""
+    if target_organism is None:
+        target_organism = TargetOrganism()
+
     ps = PrimerScheme.model_validate_json(info_path.read_text())
 
     # append
@@ -685,7 +724,8 @@ def add_target_organism(
 @modify_app.command
 def update_algorithm(
     info_path: Annotated[
-        pathlib.Path, Parameter(validator=validators.Path(exists=True, file_okay=True))
+        pathlib.Path,
+        Parameter(validator=validators.Path(exists=True, file_okay=True)),
     ],
     algorithm: Algorithm,
 ):
@@ -702,7 +742,9 @@ def build_index(
         pathlib.Path,
         Parameter(
             env_var="PRIMER_SCHEMES_PATH",
-            validator=validators.Path(exists=True, dir_okay=True, file_okay=False),
+            validator=validators.Path(
+                exists=True, dir_okay=True, file_okay=False
+            ),
             help="The path to the primerschemes directory. Will use the ENV VAR PRIMER_SCHEMES_PATH",
         ),
     ],
@@ -739,7 +781,9 @@ def all(
         pathlib.Path,
         Parameter(
             env_var="PRIMER_SCHEMES_PATH",
-            validator=validators.Path(exists=True, dir_okay=True, file_okay=False),
+            validator=validators.Path(
+                exists=True, dir_okay=True, file_okay=False
+            ),
             help="The path to the primerschemes directory. Will use the ENV VAR PRIMER_SCHEMES_PATH",
         ),
     ],
@@ -753,7 +797,8 @@ def all(
 @app.command
 def regenerate(
     info_path: Annotated[
-        pathlib.Path, Parameter(validator=validators.Path(exists=True, file_okay=True))
+        pathlib.Path,
+        Parameter(validator=validators.Path(exists=True, file_okay=True)),
     ],
     reformat_primer_bed: bool = False,
 ):
@@ -771,11 +816,15 @@ def regenerate(
         bls = sort_bedlines(bls)
         BedLineParser.to_file(info_path.parent / PRIMER_FILE_NAME, _h, bls)
 
-    validate_ref_and_bed(bls, str((info_path.parent / REFERENCE_FILE_NAME).absolute()))
+    validate_ref_and_bed(
+        bls, str((info_path.parent / REFERENCE_FILE_NAME).absolute())
+    )
 
     # Regenerate the hashes
     ps.primer_file_sha256 = sha256_checksum(info_path.parent / PRIMER_FILE_NAME)
-    ps.reference_file_sha256 = sha256_checksum(info_path.parent / REFERENCE_FILE_NAME)
+    ps.reference_file_sha256 = sha256_checksum(
+        info_path.parent / REFERENCE_FILE_NAME
+    )
     ps.primer_checksum = primaschema_bed_hash(None, bls)
     ps.reference_checksum = primaschema_ref_hash(
         info_path.parent / REFERENCE_FILE_NAME, None
