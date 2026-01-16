@@ -4,23 +4,32 @@
 
 ## Dev notes
 
-`pytest -v test/test_all.py::test_dev_scheme`
+`uv run pytest -v test/test_all.py::test_dev_scheme`
 
 A toolkit for fetching, validating and interrogating tiled amplicon PCR primer scheme definitions. Provides convenient programmatic accesss to the [PHA4GE primer-schemes repository](https://github.com/pha4ge/primer-schemes), a community repository of tiled amplicons primer schemes.
 
-## Install (Python 3.8+)
+## Install (Python 3.10+)
 
 ```shell
 # Latest stable release
 pip install primaschema
 
-# From main branch
-git clone https://github.com/pha4ge/primaschema
-pip install ./primaschema
+# Or using uv
+uv pip install primaschema
+```
 
-# Development
+### Development
+
+```shell
 git clone https://github.com/pha4ge/primaschema.git
 cd primaschema
+
+# Using uv (recommended)
+uv sync --all-extras
+uv run primaschema --help
+uv run pytest
+
+# Or using pip
 pip install --editable '.[dev]'
 pre-commit install
 pytest

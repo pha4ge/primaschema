@@ -97,7 +97,7 @@ linkml_meta = LinkMLMeta({'default_curi_maps': ['semweb_context'],
                              'prefix_reference': 'https://w3id.org/linkml/'},
                   'schema': {'prefix_prefix': 'schema',
                              'prefix_reference': 'http://schema.org/'}},
-     'source_file': '/Users/kentcg/primaschema/src/primaschema/schema/info.yml'} )
+     'source_file': '/Users/bede/Research/git/primaschema/src/primaschema/schema/info.yml'} )
 
 class SchemeStatus(str, Enum):
     """
