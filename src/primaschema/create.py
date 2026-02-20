@@ -67,10 +67,10 @@ app = App(
     version_flags="--show-version",
     error_console=error_console,
 )
-modify_app = App(name="modify")
+modify_app = App(name="modify", help="Modify fields of an existing primer scheme")
 app.command(modify_app)
 
-validate_app = App(name="validate")
+validate_app = App(name="validate", help="Validate primer scheme definitions")
 app.command(validate_app)
 
 
@@ -418,6 +418,7 @@ def create(
         ),
     ] = None,
 ):
+    """Create a new primer scheme definition."""
     # Parse algorithm if provided
     if algorithm:
         cli_ps.algorithm = parse_algorithm(algorithm)
@@ -727,6 +728,7 @@ def build_index(
     manifest_path: Optional[pathlib.Path] = None,
     base_url: str = "",
 ):
+    """Build a JSON index of all primer schemes in a directory."""
     # Set up logging
     configure_logging(debug=False)
 
@@ -776,12 +778,7 @@ def regenerate(
     ],
     reformat_primer_bed: bool = False,
 ):
-    """
-    Regenerates the metadata.
-    - (optionally) reformats the primer.bed file
-    - updates hashes
-    - updates readme
-    """
+    """Regenerate and normalise scheme metadata"""
     ps = PrimerScheme.model_validate_json(info_path.read_text())
     _h, bls = BedLineParser.from_file(info_path.parent / PRIMER_FILE_NAME)
 

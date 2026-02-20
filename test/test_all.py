@@ -257,3 +257,24 @@ def test_subset():
 def test_dev_scheme():
     lib.validate(data_dir / "dev-scheme")
     lib.validate(data_dir / "dev-scheme", full=True, rebuild=True)
+
+
+def test_cli_create():
+    run("mkdir -p built && rm -rf built/artic", cwd="./")
+    run(
+        "uv run primaschema create"
+        " --name artic"
+        " --amplicon-size 400"
+        " --version v4.1.0"
+        " --contributors 'ARTIC network'"
+        " --target-organisms sars-cov-2"
+        " --status DEPRECATED"
+        " --bed-path test/data/dev-scheme/primer.bed"
+        " --reference-path test/data/dev-scheme/reference.fasta"
+        " --primer-schemes-path built",
+        cwd="./",
+    )
+    assert Path("built/artic/400/v4.1.0/primer.bed").exists()
+    assert Path("built/artic/400/v4.1.0/reference.fasta").exists()
+    assert Path("built/artic/400/v4.1.0/info.json").exists()
+    run("rm -rf built/artic", cwd="./")
