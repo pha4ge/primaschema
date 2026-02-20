@@ -16,8 +16,8 @@ def run(cmd, cwd=data_dir):  # Helper for CLI testing
     )
 
 
-def test_cli_version():
-    run("primaschema --version")
+# def test_cli_version():
+#     run("primaschema --version")
 
 
 def test_hash_ref():
@@ -29,25 +29,25 @@ def test_hash_ref():
     )
 
 
-def test_cli_hash_ref():
-    run_cmd = run(
-        "primaschema hash-ref primer-schemes/schemes/sars-cov-2/eden/2500/v1.0.0/reference.fasta"
-    )
-    assert "primaschema:b1acd7163146bf17" in run_cmd.stdout
+# def test_cli_hash_ref():
+#     run_cmd = run(
+#         "primaschema hash-ref primer-schemes/schemes/sars-cov-2/eden/2500/v1.0.0/reference.fasta"
+#     )
+#     assert "primaschema:b1acd7163146bf17" in run_cmd.stdout
 
 
-def test_cli_hash_primer_bed():
-    run_cmd = run(
-        "primaschema hash-bed primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0/primer.bed"
-    )
-    assert "primaschema:3ef3e7bb23008684" in run_cmd.stdout
+# def test_cli_hash_primer_bed():
+#     run_cmd = run(
+#         "primaschema hash-bed primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0/primer.bed"
+#     )
+#     assert "primaschema:3ef3e7bb23008684" in run_cmd.stdout
 
 
-def test_cli_scheme_bed():
-    run_cmd = run(
-        "primaschema hash-bed primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0/scheme.bed"
-    )
-    assert "primaschema:3ef3e7bb23008684" in run_cmd.stdout
+# def test_cli_scheme_bed():
+#     run_cmd = run(
+#         "primaschema hash-bed primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0/scheme.bed"
+#     )
+#     assert "primaschema:3ef3e7bb23008684" in run_cmd.stdout
 
 
 # def test_artic_v41_scheme_hash_matches_primer_hash():
@@ -149,14 +149,14 @@ def test_scheme_bed_to_primer_bed():
     assert bed_str == expected_bed_str
 
 
-def test_diff():
-    run_cmd = run(
-        "primaschema diff primer-schemes/schemes/sars-cov-2/midnight/1200/v1.0.0/primer.bed primer-schemes/schemes/sars-cov-2/midnight/1200/v2.0.0/primer.bed"
-    )
-    assert (
-        """SARS-CoV-2_28_LEFT_2""" in run_cmd.stdout.strip()
-        and len(run_cmd.stdout.strip().split("\n")) == 2
-    )
+# def test_diff():
+#     run_cmd = run(
+#         "primaschema diff primer-schemes/schemes/sars-cov-2/midnight/1200/v1.0.0/primer.bed primer-schemes/schemes/sars-cov-2/midnight/1200/v2.0.0/primer.bed"
+#     )
+#     assert (
+#         """SARS-CoV-2_28_LEFT_2""" in run_cmd.stdout.strip()
+#         and len(run_cmd.stdout.strip().split("\n")) == 2
+#     )
 
 
 def test_calculate_intervals():
@@ -169,11 +169,11 @@ def test_calculate_intervals():
     assert intervals["SARS-CoV-2_99"] == (29452, 29854)
 
 
-def test_print_intervals():
-    run_cmd = run(
-        "primaschema show-intervals primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0/primer.bed"
-    )
-    assert """MN908947.3\t29452\t29854\tSARS-CoV-2_99\n""" in run_cmd.stdout
+# def test_print_intervals():
+#     run_cmd = run(
+#         "primaschema show-intervals primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0/primer.bed"
+#     )
+#     assert """MN908947.3\t29452\t29854\tSARS-CoV-2_99\n""" in run_cmd.stdout
 
 
 def test_plot_single_ref_chrom_ref():

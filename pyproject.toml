@@ -11,7 +11,7 @@ authors = [
 ]
 dynamic = ["version", "description"]
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 keywords = ["genomics"]
 license = {text = "MIT License"}
 classifiers = [
@@ -41,7 +41,7 @@ dependencies = [
 ]
 
 [project.scripts]
-primaschema = "primaschema.cli:main"
+primaschema = "primaschema.create:app"
 new = "primaschema.create:app"
 
 [project.urls]

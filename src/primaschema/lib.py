@@ -446,11 +446,19 @@ def build(
 
 
 def get_scheme_cname(scheme: dict, sep: Literal["/", "_"] = "/") -> str:
-    organism = str(scheme.get("organism", ""))
+    target_organisms = scheme.get("target_organisms", [])
+    if target_organisms:
+        first = target_organisms[0]
+        organism = (
+            first.get("common_name", "") if isinstance(first, dict) else str(first)
+        ) or ""
+    else:
+        organism = str(scheme.get("organism", ""))
     name = str(scheme["name"])
     amplicon_size = str(scheme.get("amplicon_size", ""))
     version = str(scheme["version"])
-    return sep.join([organism, name, amplicon_size, version])
+    parts = [p for p in [organism, name, amplicon_size, version] if p]
+    return sep.join(parts)
 
 
 def build_manifest(root_dir: Path, out_dir: Path = Path()):

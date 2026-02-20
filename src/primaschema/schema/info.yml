@@ -24,7 +24,7 @@ classes:
     #    preconditions:
     #      slot_conditions:
     #        version:
-    #          pattern: "^v\\d+\\.\\d+\\.\\d+$" 
+    #          pattern: "^v\\d+\\.\\d+\\.\\d+$"
     #    postconditions:
     #      slot_conditions:
     #        ref_selections:
@@ -87,7 +87,7 @@ classes:
       name:
         description: "The name of the Algorithm"
         required: true
-      version: 
+      version:
         slot_uri: IAO:0000129
         description: "The version of the Algorithm"
 
@@ -96,9 +96,9 @@ classes:
         file_sha256:
           description: SHA256 checksum for the reference selection file
           pattern: "^[a-fA-F0-9]{64}$"
-        file_name: 
+        file_name:
           description: File name of the reference selection file
-        chromosome: 
+        chromosome:
           description: The chromosome in the primerbed file for which this provides reference selection
 
   TargetOrganism:
@@ -190,7 +190,7 @@ slots:
   derived_from:
     slot_uri: GENEPIO:0100671
     description: "Canonical name of the primer scheme from which this scheme was derived"
-  tags: 
+  tags:
     description: "Tags to describe the primerscheme"
     range: SchemeTag
     multivalued: true
@@ -208,7 +208,7 @@ slots:
 
 
 
-  
+
 enums:
   SchemeStatus:
     description: "Status of this amplicon primer scheme"
