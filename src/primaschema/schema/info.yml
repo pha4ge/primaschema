@@ -92,14 +92,14 @@ classes:
         description: "The version of the Algorithm"
 
   RefSelection:
-      attributes:
-        file_sha256:
-          description: SHA256 checksum for the reference selection file
-          pattern: "^sha256:[a-fA-F0-9]{64}$"
-        file_name:
-          description: File name of the reference selection file
-        chromosome:
-          description: The chromosome in the primerbed file for which this provides reference selection
+    attributes:
+      file_sha256:
+        description: SHA256 checksum for the reference selection file
+        pattern: "^sha256:[a-fA-F0-9]{64}$"
+      file_name:
+        description: File name of the reference selection file
+      chromosome:
+        description: The chromosome in the primerbed file for which this provides reference selection
 
   TargetOrganism:
     class_uri: EDAM:1869
@@ -206,9 +206,6 @@ slots:
     inlined_as_list: true
     required: false
 
-
-
-
 enums:
   SchemeStatus:
     description: "Status of this amplicon primer scheme"
@@ -231,4 +228,3 @@ enums:
       MULTI-TARGET:
       PANEL:
       QPCR:
-

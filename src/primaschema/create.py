@@ -44,7 +44,8 @@ from primaschema.util import (
     primaschema_ref_hash,
     sha256_checksum,
 )
-from primaschema.validate import validate_all, validate as validate_scheme
+from primaschema.validate import validate as validate_scheme
+from primaschema.validate import validate_all
 
 
 def configure_logging(debug: bool):
