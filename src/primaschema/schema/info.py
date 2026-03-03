@@ -147,12 +147,12 @@ class PrimerScheme(ConfiguredBaseModel):
     aliases: Optional[list[str]] = Field(default=[], description="""Aliases for primer scheme name""", json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme'], 'slot_uri': 'GENEPIO:0100670'} })
     license: Optional[SchemeLicense] = Field(default='CC-BY-SA-4.0', description="""License under which the primer scheme is distributed""", json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme'], 'ifabsent': 'SchemeLicense(CC-BY-SA-4.0)'} })
     status: SchemeStatus = Field(default=..., description="""The status of this primer scheme (e.g. published, deprecated)""", json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme'], 'slot_uri': 'GENEPIO:0100681'} })
-    tags: Optional[list[SchemeTag]] = Field(default=[], description="""Tags to describe the primerscheme""", json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme']} })
+    tags: Optional[list[SchemeTag]] = Field(default=[], description="""Tags to describe the primer scheme""", json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme']} })
     derived_from: Optional[str] = Field(default=None, description="""Canonical name of the primer scheme from which this scheme was derived""", json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme'], 'slot_uri': 'GENEPIO:0100671'} })
     citations: Optional[list[str]] = Field(default=[], description="""URLs of publications describing the scheme (DOIs preferred when available)""", json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme'], 'slot_uri': 'IAO:0000301'} })
     notes: Optional[list[str]] = Field(default=[], description="""Notes about the amplicon primer scheme""", json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme'], 'slot_uri': 'GENEPIO:0100672'} })
     vendors: Optional[list[Vendor]] = Field(default=[], description="""Vendors where one can purchase the primers described in the amplicon scheme or a kit containing these primers""", json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme']} })
-    algorithm: Optional[Algorithm] = Field(default=None, description="""The algorithm (if any) used to generate this primerscheme""", json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme']} })
+    algorithm: Optional[Algorithm] = Field(default=None, description="""The algorithm (if any) used to generate this primer scheme""", json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme']} })
     primer_checksum: Optional[str] = Field(default=None, description="""Checksum for the primer scheme BED file, in format checksum_type:checksum, where checksum_type is lowercase name of checksum generator e.g. primaschema""", json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme'], 'slot_uri': 'GENEPIO:0100675'} })
     primer_file_sha256: Optional[str] = Field(default=None, description="""SHA256 checksum for the primer scheme BED file""", json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme']} })
     reference_checksum: Optional[str] = Field(default=None, description="""Checksum for the reference FASTA file, in format checksum_type:checksum, where checksum_type is lowercase name of checksum generator e.g. primaschema""", json_schema_extra = { "linkml_meta": {'domain_of': ['PrimerScheme']} })
@@ -226,7 +226,7 @@ class Vendor(ConfiguredBaseModel):
 
 class Contributor(ConfiguredBaseModel):
     """
-    Person or organisation who contributed to primerscheme development
+    Person or organisation who contributed to primer scheme development
     """
     linkml_meta: ClassVar[LinkMLMeta] = LinkMLMeta({'class_uri': 'IAO:contributor',
          'from_schema': 'https://github.com/pha4ge/primer-schemes/schemas/primer-scheme'})
@@ -252,7 +252,7 @@ class Contributor(ConfiguredBaseModel):
 
 class Algorithm(ConfiguredBaseModel):
     """
-    Algorithm used to generate the primerscheme
+    Algorithm used to generate the primer scheme
     """
     linkml_meta: ClassVar[LinkMLMeta] = LinkMLMeta({'class_uri': 'IAO:0000064',
          'from_schema': 'https://github.com/pha4ge/primer-schemes/schemas/primer-scheme'})
@@ -284,7 +284,7 @@ class RefSelection(ConfiguredBaseModel):
 
 class TargetOrganism(ConfiguredBaseModel):
     """
-    The organisms targeted by this primerscheme
+    The organisms targeted by this primer scheme
     """
     linkml_meta: ClassVar[LinkMLMeta] = LinkMLMeta({'class_uri': 'EDAM:1869',
          'from_schema': 'https://github.com/pha4ge/primer-schemes/schemas/primer-scheme'})

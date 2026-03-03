@@ -123,5 +123,5 @@ def primaschema_ref_hash(
     return f"primaschema:ref:{hasher.hexdigest()[:16]}"
 
 
-def find_all_info_json(primerschemes_repo: Path):
-    return list(primerschemes_repo.rglob(f"*/{METADATA_FILE_NAME}"))
+def find_all_info_json(primer_schemes_path: Path):
+    return list(primer_schemes_path.rglob(f"*/{METADATA_FILE_NAME}"))

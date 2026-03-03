@@ -51,7 +51,7 @@ class ManifestPrimerScheme(BaseModel):
     )
     tags: Optional[list[SchemeTag]] = Field(
         default=[],
-        description="""Tags to describe the primerscheme""",
+        description="""Tags to describe the primer scheme""",
     )
     derived_from: Optional[str] = Field(
         default=None,
@@ -113,12 +113,12 @@ class ManifestPrimerScheme(BaseModel):
 
 class PrimerSchemeIndex(ConfiguredBaseModel):
     """
-    An index of primer primerschemes.
+    An index of primer schemes.
     """
 
     primerschemes: dict[str, dict[int, dict[str, ManifestPrimerScheme]]] = Field(
         default_factory=dict,
-        description="Index of primer primerschemes structured as {name: {amplicon_size: {version: scheme}}}",
+        description="Index of primer schemes structured as {name: {amplicon_size: {version: scheme}}}",
     )
 
     def add_manifest_primer_scheme(self, manifest: ManifestPrimerScheme, strict=True):
@@ -184,11 +184,11 @@ class PrimerSchemeIndex(ConfiguredBaseModel):
 
 
 def create_index(
-    primerprimerschemes: list[PrimerScheme], base_url: str = ""
+    primer_schemes: list[PrimerScheme], base_url: str = ""
 ) -> PrimerSchemeIndex:
     psi = PrimerSchemeIndex()
 
-    for ps in primerprimerschemes:
+    for ps in primer_schemes:
         # Convert to manifest
         mps = ManifestPrimerScheme.from_primer_scheme(ps, base_url=base_url)
         psi.add_manifest_primer_scheme(mps)
@@ -196,12 +196,12 @@ def create_index(
 
 
 def update_index(
-    primerprimerschemes: list[PrimerScheme],
+    primer_schemes: list[PrimerScheme],
     index: PrimerSchemeIndex,
     strict: bool = True,
     base_url: str = "",
 ):
-    for ps in primerprimerschemes:
+    for ps in primer_schemes:
         # Convert to manifest
         mps = ManifestPrimerScheme.from_primer_scheme(ps, base_url=base_url)
         index.add_manifest_primer_scheme(mps, strict)

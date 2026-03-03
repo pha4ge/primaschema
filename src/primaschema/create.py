@@ -152,16 +152,20 @@ def parse_vendor_single(v: Any) -> Vendor:
 
 
 def _save_and_regenerate(
-    info_path: pathlib.Path, ps: PrimerScheme, regenerate_plot: bool = False
+    info_path: pathlib.Path, primer_scheme: PrimerScheme, regenerate_plot: bool = False
 ):
     """Saves the PrimerScheme to info.json and regenerates the README."""
     # Save info.json
     with open(info_path, "w") as f:
-        f.write(ps.model_dump_json(exclude_unset=True, exclude_none=True, indent=4))
+        f.write(
+            primer_scheme.model_dump_json(
+                exclude_unset=True, exclude_none=True, indent=4
+            )
+        )
 
     # Regenerate README
     scheme_dir = info_path.parent
-    generate_readme(scheme_dir, ps)
+    generate_readme(scheme_dir, primer_scheme)
     logger.debug(f"Scheme saved and regenerated README.md ({info_path})")
 
     if regenerate_plot:
@@ -169,11 +173,11 @@ def _save_and_regenerate(
         plot_primers(scheme_dir / PRIMER_FILE_NAME, scheme_dir / "work" / "primer.svg")
 
 
-def create_status_badge(primerscheme: PrimerScheme) -> str:
+def create_status_badge(primer_scheme: PrimerScheme) -> str:
     """
     Create a badge for the README.md file
     """
-    match primerscheme.status:
+    match primer_scheme.status:
         case SchemeStatus.VALIDATED:
             color = "green"
         case SchemeStatus.WITHDRAWN | SchemeStatus.DEPRECATED:
@@ -181,12 +185,12 @@ def create_status_badge(primerscheme: PrimerScheme) -> str:
         case _:
             color = "blue"
 
-    return f"[![Generic badge](https://img.shields.io/badge/STATUS-{primerscheme.status}-{color}.svg)]"
+    return f"[![Generic badge](https://img.shields.io/badge/STATUS-{primer_scheme.status}-{color}.svg)]"
 
 
-def generate_readme(path: pathlib.Path, primerscheme: PrimerScheme):
+def generate_readme(path: pathlib.Path, primer_scheme: PrimerScheme):
     """
-    Generate the README.md file for a scheme
+    Generate the README.md file for a primer scheme
 
     :param path: The path to the scheme directory
     :type path: pathlib.Path
@@ -198,44 +202,44 @@ def generate_readme(path: pathlib.Path, primerscheme: PrimerScheme):
 
     with open(path / "README.md", "w") as readme:
         readme.write(
-            f"# {primerscheme.name} {primerscheme.amplicon_size}bp {primerscheme.version}\n\n"
+            f"# {primer_scheme.name} {primer_scheme.amplicon_size}bp {primer_scheme.version}\n\n"
         )
         # Add the status badge
-        readme.write(f"{create_status_badge(primerscheme)}\n\n")
+        readme.write(f"{create_status_badge(primer_scheme)}\n\n")
 
         # Add citation if present
-        if primerscheme.citations and primerscheme.citations is not None:
-            for cit in primerscheme.citations:
+        if primer_scheme.citations and primer_scheme.citations is not None:
+            for cit in primer_scheme.citations:
                 readme.write(f"> If you use this scheme please cite: {cit}\n\n")
 
         readme.write(
-            f"[primalscheme labs](https://labs.primalscheme.com/detail/{primerscheme.name}/{primerscheme.amplicon_size}/{primerscheme.version})\n\n"
+            f"[primalscheme labs](https://labs.primalscheme.com/detail/{primer_scheme.name}/{primer_scheme.amplicon_size}/{primer_scheme.version})\n\n"
         )
 
-        if primerscheme.notes and primerscheme.notes is not None:
+        if primer_scheme.notes and primer_scheme.notes is not None:
             readme.write("## Notes\n\n")
-            for note in primerscheme.notes:
+            for note in primer_scheme.notes:
                 readme.write(note + "\n\n")
 
         readme.write("## Metadata\n\n")
-        if primerscheme.target_organisms:
+        if primer_scheme.target_organisms:
             readme.write("**Target Organisms:**\n")
-            for to in primerscheme.target_organisms:
+            for to in primer_scheme.target_organisms:
                 to_str = f"- {to.common_name or ''}"
                 if to.ncbi_tax_id:
                     to_str += f" (Tax ID: {to.ncbi_tax_id})"
                 readme.write(f"{to_str}\n")
             readme.write("\n")
 
-        if primerscheme.derived_from:
-            readme.write(f"**Derived from:** {primerscheme.derived_from}\n\n")
+        if primer_scheme.derived_from:
+            readme.write(f"**Derived from:** {primer_scheme.derived_from}\n\n")
 
-        if primerscheme.tags:
-            readme.write(f"**Tags:** {', '.join(primerscheme.tags)}\n\n")
+        if primer_scheme.tags:
+            readme.write(f"**Tags:** {', '.join(primer_scheme.tags)}\n\n")
 
-        if primerscheme.contributors:
+        if primer_scheme.contributors:
             readme.write("## Contributors\n\n")
-            for contributor in primerscheme.contributors:
+            for contributor in primer_scheme.contributors:
                 contrib_str = f"- {contributor.name}"
                 if contributor.email:
                     contrib_str += f" <{contributor.email}>"
@@ -244,9 +248,9 @@ def generate_readme(path: pathlib.Path, primerscheme: PrimerScheme):
                 readme.write(f"{contrib_str}\n")
             readme.write("\n")
 
-        if primerscheme.vendors:
+        if primer_scheme.vendors:
             readme.write("## Vendors\n\n")
-            for vendor in primerscheme.vendors:
+            for vendor in primer_scheme.vendors:
                 vendor_str = f"- {vendor.organisation_name}"
                 if vendor.kit_name:
                     vendor_str += f": {vendor.kit_name}"
@@ -264,10 +268,10 @@ def generate_readme(path: pathlib.Path, primerscheme: PrimerScheme):
 
         # Write the details into the readme
         readme.write(
-            f"""```json\n{primerscheme.model_dump_json(indent=4, exclude_unset=True, exclude_none=True)}\n```\n\n"""
+            f"""```json\n{primer_scheme.model_dump_json(indent=4, exclude_unset=True, exclude_none=True)}\n```\n\n"""
         )
 
-        if primerscheme.license == SchemeLicense.CC_BY_SA_4FULL_STOP0:
+        if primer_scheme.license == SchemeLicense.CC_BY_SA_4FULL_STOP0:
             readme.write(LICENSE_TXT_CC_BY_SA_4_0)
 
 
@@ -408,7 +412,7 @@ def create(
         Parameter(
             env_var="PRIMER_SCHEMES_PATH",
             validator=validators.Path(exists=True, dir_okay=True, file_okay=False),
-            help="The path to the primerschemes directory. Will use the ENV VAR PRIMER_SCHEMES_PATH",
+            help="The path to the primer schemes directory. Will use the ENV VAR PRIMER_SCHEMES_PATH",
         ),
     ],
     algorithm: Annotated[
@@ -722,7 +726,7 @@ def build_index(
         Parameter(
             env_var="PRIMER_SCHEMES_PATH",
             validator=validators.Path(exists=True, dir_okay=True, file_okay=False),
-            help="The path to the primerschemes directory. Will use the ENV VAR PRIMER_SCHEMES_PATH",
+            help="The path to the primer schemes directory. Will use the ENV VAR PRIMER_SCHEMES_PATH",
         ),
     ],
     manifest_path: Optional[pathlib.Path] = None,
@@ -738,7 +742,7 @@ def build_index(
     else:
         psi = PrimerSchemeIndex()
 
-    # find all primerschemes
+    # find all primer schemes
     ps = []
     for ps_info in find_all_info_json(primer_schemes_path):
         logger.debug(f"found {ps_info}")
@@ -760,7 +764,7 @@ def all(
         Parameter(
             env_var="PRIMER_SCHEMES_PATH",
             validator=validators.Path(exists=True, dir_okay=True, file_okay=False),
-            help="The path to the primerschemes directory. Will use the ENV VAR PRIMER_SCHEMES_PATH",
+            help="The path to the primer schemes directory. Will use the ENV VAR PRIMER_SCHEMES_PATH",
         ),
     ],
     additional_linkml: bool = False,
@@ -778,7 +782,7 @@ def regenerate(
     ],
     reformat_primer_bed: bool = False,
 ):
-    """Regenerate and normalise scheme metadata"""
+    """Regenerate and normalise primer scheme metadata"""
     ps = PrimerScheme.model_validate_json(info_path.read_text())
     _h, bls = BedLineParser.from_file(info_path.parent / PRIMER_FILE_NAME)
 

@@ -66,7 +66,7 @@ classes:
 
   Contributor:
     class_uri: IAO:contributor
-    description: "Person or organisation who contributed to primerscheme development"
+    description: "Person or organisation who contributed to primer scheme development"
     attributes:
       name:
         slot_uri: IAO:0000590 # A textual entity that denotes a particular in reality.
@@ -82,7 +82,7 @@ classes:
 
   Algorithm:
     class_uri: IAO:0000064
-    description: "Algorithm used to generate the primerscheme"
+    description: "Algorithm used to generate the primer scheme"
     attributes:
       name:
         description: "The name of the Algorithm"
@@ -103,7 +103,7 @@ classes:
 
   TargetOrganism:
     class_uri: EDAM:1869
-    description: "The organisms targeted by this primerscheme"
+    description: "The organisms targeted by this primer scheme"
     attributes:
       common_name:
         slot_uri: EDAM:1874
@@ -191,12 +191,12 @@ slots:
     slot_uri: GENEPIO:0100671
     description: "Canonical name of the primer scheme from which this scheme was derived"
   tags:
-    description: "Tags to describe the primerscheme"
+    description: "Tags to describe the primer scheme"
     range: SchemeTag
     multivalued: true
     inlined_as_list: true
   algorithm:
-    description: "The algorithm (if any) used to generate this primerscheme"
+    description: "The algorithm (if any) used to generate this primer scheme"
     range: Algorithm
     inlined_as_list: true
   ref_selections:

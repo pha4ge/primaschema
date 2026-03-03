@@ -24,11 +24,11 @@ class ValidationEngine(enum.Enum):
 
 def validate_scheme_json_with_pydantic(info_path: Path) -> PrimerScheme:
     # Use the derived pydantic model
-    primerscheme = PrimerScheme.model_validate_json(info_path.read_text())
+    primer_scheme = PrimerScheme.model_validate_json(info_path.read_text())
 
     # TODO Handle the rules not encoded in base model.
 
-    return primerscheme
+    return primer_scheme
 
 
 def validate_scheme_json_with_linkml(info_path: Path) -> None:
@@ -66,49 +66,53 @@ def validate_primer_bed(infopath: Path, strict: bool = False) -> Scheme:
     return scheme
 
 
-def validate_name(infopath: Path, primerscheme: PrimerScheme | None = None):
+def validate_name(infopath: Path, primer_scheme: PrimerScheme | None = None):
     """
     Validate the schemename, ampliconsize, and schemeversion in the path, README.md, and info.json
     :raises ValueError: If a mismatch is found
     :raises FileNotFoundError: If the README.md does not exist
     """
     # Use provided PrimerScheme (prevent duplication) or read in for validation
-    if primerscheme is None:
-        primerscheme = PrimerScheme.model_validate_json(infopath.read_text())
+    if primer_scheme is None:
+        primer_scheme = PrimerScheme.model_validate_json(infopath.read_text())
 
-    primerscheme_derived_scheme_path = (
-        Path(primerscheme.name) / str(primerscheme.amplicon_size) / primerscheme.version
+    scheme_subpath = (
+        Path(primer_scheme.name)
+        / str(primer_scheme.amplicon_size)
+        / primer_scheme.version
     )
 
     # Check the info version matches path version
     version_path = infopath.parent.name
-    if primerscheme.version != version_path:
+    if primer_scheme.version != version_path:
         raise ValueError(
-            f"Version mismatch for {primerscheme_derived_scheme_path}: info ({primerscheme.version}) != path ({version_path})"
+            f"Version mismatch for {scheme_subpath}: info ({primer_scheme.version}) != path ({version_path})"
         )
 
     # Check the amplicon size matches the schemepath
     ampliconsize_path = infopath.parent.parent.name
-    if str(primerscheme.amplicon_size) != ampliconsize_path:
+    if str(primer_scheme.amplicon_size) != ampliconsize_path:
         raise ValueError(
-            f"Amplicon size mismatch for {primerscheme_derived_scheme_path}: info ({primerscheme.amplicon_size}) != path ({ampliconsize_path})"
+            f"Amplicon size mismatch for {scheme_subpath}: info ({primer_scheme.amplicon_size}) != path ({ampliconsize_path})"
         )
 
     # Check the schemepath matches the path
     schemeid_path = infopath.parent.parent.parent.name
-    if primerscheme.name != schemeid_path:
+    if primer_scheme.name != schemeid_path:
         raise ValueError(
-            f"Name mismatch for {primerscheme_derived_scheme_path}: info ({primerscheme.name}) != path ({schemeid_path})"
+            f"Name mismatch for {scheme_subpath}: info ({primer_scheme.name}) != path ({schemeid_path})"
         )
 
 
-def validate_readme(infopath: Path, primerscheme: PrimerScheme | None = None):
+def validate_readme(infopath: Path, primer_scheme: PrimerScheme | None = None):
     # Use provided PrimerScheme (prevent duplication) or read in for validation
-    if primerscheme is None:
-        primerscheme = PrimerScheme.model_validate_json(infopath.read_text())
+    if primer_scheme is None:
+        primer_scheme = PrimerScheme.model_validate_json(infopath.read_text())
 
-    primerscheme_derived_scheme_path = (
-        Path(primerscheme.name) / str(primerscheme.amplicon_size) / primerscheme.version
+    scheme_subpath = (
+        Path(primer_scheme.name)
+        / str(primer_scheme.amplicon_size)
+        / primer_scheme.version
     )
 
     # Check the ReadME.md
@@ -118,43 +122,45 @@ def validate_readme(infopath: Path, primerscheme: PrimerScheme | None = None):
 
     # Check the readme has been updated
     readme = readme.read_text()
-    if readme.find(primerscheme.name) == -1:
+    if readme.find(primer_scheme.name) == -1:
         raise ValueError(
-            f"Scheme name ({primerscheme.name}) not found in {readme}: {primerscheme_derived_scheme_path}"
+            f"Scheme name ({primer_scheme.name}) not found in {readme}: {scheme_subpath}"
         )
-    if readme.find(str(primerscheme.amplicon_size)) == -1:
+    if readme.find(str(primer_scheme.amplicon_size)) == -1:
         raise ValueError(
-            f"Amplicon size ({primerscheme.amplicon_size}) not found in {readme}: {primerscheme_derived_scheme_path}"
+            f"Amplicon size ({primer_scheme.amplicon_size}) not found in {readme}: {scheme_subpath}"
         )
-    if readme.find(primerscheme.version) == -1:
+    if readme.find(primer_scheme.version) == -1:
         raise ValueError(
-            f"Scheme version ({primerscheme.version}) not found in {readme}: {primerscheme_derived_scheme_path}"
+            f"Scheme version ({primer_scheme.version}) not found in {readme}: {scheme_subpath}"
         )
 
 
-def validate_hashes(infopath: Path, primerscheme: PrimerScheme | None = None):
+def validate_hashes(infopath: Path, primer_scheme: PrimerScheme | None = None):
     # Use provided PrimerScheme (prevent duplication) or read in for validation
-    if primerscheme is None:
-        primerscheme = PrimerScheme.model_validate_json(infopath.read_text())
+    if primer_scheme is None:
+        primer_scheme = PrimerScheme.model_validate_json(infopath.read_text())
 
-    primerscheme_derived_scheme_path = (
-        Path(primerscheme.name) / str(primerscheme.amplicon_size) / primerscheme.version
+    scheme_subpath = (
+        Path(primer_scheme.name)
+        / str(primer_scheme.amplicon_size)
+        / primer_scheme.version
     )
 
     # Check sha256 hash bedfile
     primer_path = infopath.parent / PRIMER_FILE_NAME
     primer_sha = sha256_checksum(primer_path)
-    if primer_sha != primerscheme.primer_file_sha256:
+    if primer_sha != primer_scheme.primer_file_sha256:
         raise ValueError(
-            f"File sha256 ({primer_sha} != info sha256 ({primerscheme.primer_file_sha256}): {primerscheme_derived_scheme_path}"
+            f"File sha256 ({primer_sha} != info sha256 ({primer_scheme.primer_file_sha256}): {scheme_subpath}"
         )
 
     # Check sha256 hash ref
     reference_path = infopath.parent / REFERENCE_FILE_NAME
     reference_sha = sha256_checksum(reference_path)
-    if reference_sha != primerscheme.reference_file_sha256:
+    if reference_sha != primer_scheme.reference_file_sha256:
         raise ValueError(
-            f"File sha256 ({reference_sha} != info sha256 ({primerscheme.reference_file_sha256}): {primerscheme_derived_scheme_path}"
+            f"File sha256 ({reference_sha} != info sha256 ({primer_scheme.reference_file_sha256}): {scheme_subpath}"
         )
 
     # TODO Check primaschema hashes.
@@ -162,7 +168,7 @@ def validate_hashes(infopath: Path, primerscheme: PrimerScheme | None = None):
 
 def validate(
     infopath: Path,
-    primerscheme: PrimerScheme | None = None,
+    primer_scheme: PrimerScheme | None = None,
     additional_linkml: bool = False,
     strict: bool = False,
 ):
@@ -171,9 +177,9 @@ def validate(
         logger.debug(f"Validated with LinkML: {infopath}")
         validate_scheme_json_with_linkml(infopath)
 
-    if primerscheme is None:
-        primerscheme = PrimerScheme.model_validate_json(infopath.read_text())
-    validate_name(infopath, primerscheme)
+    if primer_scheme is None:
+        primer_scheme = PrimerScheme.model_validate_json(infopath.read_text())
+    validate_name(infopath, primer_scheme)
     logger.debug(f"Validated with Pydantic: {infopath}")
 
     # Validate primer + ref
@@ -182,17 +188,17 @@ def validate(
     logger.debug(f"Validated primer.bed files:  {infopath}")
 
     # Validate hashes
-    validate_hashes(infopath, primerscheme)
-    validate_readme(infopath, primerscheme)
+    validate_hashes(infopath, primer_scheme)
+    validate_readme(infopath, primer_scheme)
     logger.debug(f"Validated hashes and README:  {infopath}")
 
 
 def validate_all(
-    primerschemes_repo: Path, additional_linkml: bool = False, strict: bool = True
+    primer_schemes_path: Path, additional_linkml: bool = False, strict: bool = True
 ):
     """
-    Recursively searches through the primerschemes_repo for {METADATA_FILE_NAME}
+    Recursively searches through the primer_schemes_path for {METADATA_FILE_NAME}
     """
 
-    for schemeinfo in primerschemes_repo.rglob(f"*/{METADATA_FILE_NAME}"):
+    for schemeinfo in primer_schemes_path.rglob(f"*/{METADATA_FILE_NAME}"):
         validate(schemeinfo, None, additional_linkml, strict)
