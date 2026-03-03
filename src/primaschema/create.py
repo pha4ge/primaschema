@@ -1,4 +1,5 @@
 import json
+import logging
 import pathlib
 import shutil
 import sys
@@ -19,7 +20,6 @@ from primaschema import (
     REFERENCE_FILE_NAME,
     logger,
 )
-from primaschema.cli import configure_logging
 from primaschema.lib import plot_primers
 from primaschema.schema.info import (
     Algorithm,
@@ -45,6 +45,18 @@ from primaschema.util import (
     sha256_checksum,
 )
 from primaschema.validate import validate_all
+
+
+def configure_logging(debug: bool):
+    if debug:
+        logger.setLevel(logging.DEBUG)
+        for handler in logger.handlers:
+            handler.setLevel(logging.DEBUG)
+    else:
+        logger.setLevel(logging.INFO)
+        for handler in logger.handlers:
+            handler.setLevel(logging.INFO)
+
 
 LICENSE_TXT_CC_BY_SA_4_0 = """\n\n------------------------------------------------------------------------
 

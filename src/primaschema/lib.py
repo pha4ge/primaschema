@@ -1,11 +1,9 @@
 import hashlib
 import json
 import re
-import shutil
 import sys
 from collections import defaultdict
 from pathlib import Path
-from tempfile import TemporaryDirectory
 from typing import Dict, Literal, Optional, Tuple
 
 import altair as alt
@@ -16,12 +14,9 @@ from Bio import SeqIO
 from linkml.generators.pydanticgen import PydanticGenerator
 
 from primaschema import (
-    CACHE_DIR,
     MANIFEST_HEADER_PATH,
     SCHEMA_DIR,
-    SCHEMES_ARCHIVE_URL,
     logger,
-    util,
 )
 from primaschema.schema import bed, info
 
@@ -164,38 +159,6 @@ def convert_scheme_bed_to_primer_bed(bed_path: Path, fasta_path: Path) -> str:
     return df.to_csv(sep="\t", header=False, index=False)
 
 
-def convert_vwf_to_primer_bed(vwf_path: Path, chrom: str = "chrom") -> str:
-    vwf_df = pd.read_csv(vwf_path, sep="\t")
-    bed_records = []
-    pool_counter = {}
-
-    for r in vwf_df.to_records("dict"):
-        amplicon_name = r["Amplicon_name"]
-        primer_name = r["Primer_name"]
-        orientation = r["Left_or_right"]
-        amplicon_number = int(amplicon_name.split("_")[-1])
-        pool_name = 1 if amplicon_number % 2 != 0 else 2
-        if amplicon_name not in pool_counter:
-            pool_counter[amplicon_name] = 1
-        else:
-            pool_counter[amplicon_name] += 1
-        strand = "+" if orientation == "left" else "-"
-        sequence = r["Sequence"]
-        start_pos = r["Position"]
-        bed_record = {}
-        bed_record["chrom"] = chrom
-        bed_record["chromStart"] = start_pos
-        bed_record["chromEnd"] = start_pos + len(sequence)
-        bed_record["name"] = primer_name
-        bed_record["poolName"] = str(pool_name)
-        bed_record["strand"] = strand
-        bed_record["sequence"] = sequence
-        bed_records.append(bed_record)
-
-    bed_df = pd.DataFrame(bed_records)
-    return bed_df.to_csv(sep="\t", header=False, index=False)
-
-
 def hash_bed(bed_path: Path) -> str:
     bed_type = infer_bed_type(bed_path)
     if bed_type == "primer":
@@ -242,18 +205,6 @@ def parse_scheme_yaml(path: Path) -> dict:
     """Parse and validate with Pydantic"""
     data = parse_yaml(path)
     return info.PrimerScheme(**data).model_dump()
-
-
-def dump(info_path: Path) -> str:
-    """
-    Read and validate an info.yaml file, then return it as JSON string
-
-    :param info_path: path to info.yaml or info.yml file
-    :return: JSON string representation of the validated scheme info
-    """
-    logger.debug(f"Reading and validating info file: {info_path}")
-    scheme_data = parse_scheme_yaml(info_path)
-    return json.dumps(scheme_data, indent=2)
 
 
 def validate_bed_and_ref(
@@ -386,65 +337,6 @@ def format_primer_bed(bed_path: Path) -> str:
     return sort_primer_df(df).to_csv(sep="\t", header=False, index=False)
 
 
-def build(
-    scheme_dir: Path,
-    out_dir: Path = Path("built"),
-    plot: bool = False,
-    nested: bool = False,  # Create nested output dir structure
-    recursive: bool = False,
-    ignore_checksums: bool = False,
-) -> None:
-    """
-    Validate and build a primer scheme given a scheme directory path.
-    Optionally do so recursively
-    """
-    if recursive:
-        for path in Path(scheme_dir).rglob("info.yml"):
-            if path.is_file() and path.name == "info.yml":
-                build(
-                    scheme_dir=path.parent,
-                    out_dir=out_dir,
-                    plot=plot,
-                    nested=True,
-                    ignore_checksums=ignore_checksums,
-                )
-    else:
-        validate(scheme_dir=scheme_dir, ignore_checksums=ignore_checksums)
-        scheme = parse_yaml(scheme_dir / "info.yml")
-        scheme_cname = get_scheme_cname(scheme)
-        if nested:
-            out_dir = Path(out_dir) / Path(scheme_cname)
-        else:
-            out_dir = Path(out_dir) / get_scheme_cname(scheme, sep="_")
-        try:
-            out_dir.mkdir(parents=True, exist_ok=True)
-        except FileExistsError:
-            raise FileExistsError(f"Output directory {out_dir} already exists")
-        scheme["primer_checksum"] = hash_bed(scheme_dir / "primer.bed")
-        scheme["reference_checksum"] = hash_ref(scheme_dir / "reference.fasta")
-        with open(out_dir / "info.yml", "w") as scheme_fh:
-            logger.debug(f"Writing info.yml to {out_dir}/info.yml")
-            yaml.dump(scheme, scheme_fh, sort_keys=False)
-        logger.debug(f"Copying primer.bed to {out_dir}/primer.bed")
-        with open(out_dir / "primer.bed", "w") as primer_fh:
-            primer_fh.write(format_primer_bed(scheme_dir / "primer.bed"))
-        logger.debug(f"Copying reference.fasta to {out_dir}/reference.fasta")
-        shutil.copy(scheme_dir / "reference.fasta", out_dir)
-        logger.debug(f"Writing scheme.bed to {out_dir}/scheme.bed")
-        scheme_bed_str = convert_primer_bed_to_scheme_bed(
-            bed_path=out_dir / "primer.bed"
-        )
-        with open(out_dir.resolve() / "scheme.bed", "w") as fh:
-            fh.write(scheme_bed_str)
-
-        if plot:
-            plot_primers(
-                bed_path=out_dir / "primer.bed", out_path=out_dir / "primer.svg"
-            )
-
-        logger.info(f"Built {scheme_cname}")
-
-
 def get_scheme_cname(scheme: dict, sep: Literal["/", "_"] = "/") -> str:
     target_organisms = scheme.get("target_organisms", [])
     if target_organisms:
@@ -493,37 +385,6 @@ def build_manifest(root_dir: Path, out_dir: Path = Path()):
     with open(out_dir / manifest_file_name, "w") as fh:
         logger.info(f"Writing {manifest_file_name} to {out_dir}/{manifest_file_name}")
         json.dump(manifest, fh, indent=4)
-
-
-def diff(bed1_path: Path, bed2_path: Path, only_positions: bool = False):
-    """Show symmetric differences between records in two primer.bed files"""
-    df1 = parse_primer_bed(bed1_path).assign(origin="bed1")
-    df2 = parse_primer_bed(bed2_path).assign(origin="bed2")
-    if only_positions:
-        column_subset = POSITION_FIELDS
-    else:
-        column_subset = PRIMER_BED_FIELDS
-    return pd.concat([df1, df2]).drop_duplicates(subset=column_subset, keep=False)
-
-
-def discordant_primers(scheme_dir: Path) -> pd.DataFrame:
-    """Show primer records with sequences not matching the reference sequence"""
-    primer_bed_path = scheme_dir / "primer.bed"
-    scheme_bed_path = scheme_dir / "scheme.bed"
-    with TemporaryDirectory() as temp_dir:
-        backfilled_bed_path = Path(temp_dir) / "primer.bed"
-        if not scheme_bed_path.exists():
-            with open(scheme_bed_path, "w") as fh:
-                fh.write(convert_primer_bed_to_scheme_bed(primer_bed_path))
-            scheme_bed_path = Path(temp_dir) / "scheme.bed"
-        with open(backfilled_bed_path, "w") as fh:
-            fh.write(
-                convert_scheme_bed_to_primer_bed(
-                    bed_path=scheme_dir / "scheme.bed",
-                    fasta_path=scheme_dir / "reference.fasta",
-                )
-            )
-        return diff(bed1_path=primer_bed_path, bed2_path=backfilled_bed_path)
 
 
 def amplicon_intervals(bed_path: Path) -> Dict[str, Dict[str, Tuple[int, int]]]:
@@ -657,12 +518,3 @@ def subset(scheme_dir: Path, chrom: str, out_dir: Path = Path("built")) -> None:
     logger.info(
         f"Wrote subset of {len(subset_primers_df)}/{len(primers_df)} primers for {chrom} to {out_dir.resolve()}"
     )
-
-
-def synchronise() -> None:
-    util.download_github_tarball(SCHEMES_ARCHIVE_URL, CACHE_DIR)
-
-
-# def fetch(string: str) -> None:
-#     with open(CACHE_DIR / "index.json", "r") as fh:
-#         manifest = json.load(fh)
