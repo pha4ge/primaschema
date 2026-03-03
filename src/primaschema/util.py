@@ -68,7 +68,7 @@ def sha256_checksum(filename: Path):
     with open(filename, "rb") as f:
         for block in iter(lambda: f.read(4096), b""):
             sha256_hasher.update(block)
-    return sha256_hasher.hexdigest()
+    return f"sha256:{sha256_hasher.hexdigest()}"
 
 
 def primaschema_bed_hash(

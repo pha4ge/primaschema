@@ -35,7 +35,7 @@
         }
     ],
     "primer_checksum": "primaschema:bed:b7d72771fcfa8a34",
-    "primer_file_sha256": "6640cd47ce429efbf074d646f002ff495939934121dfb2dd78a925da2d1e6036",
+    "primer_file_sha256": "sha256:6640cd47ce429efbf074d646f002ff495939934121dfb2dd78a925da2d1e6036",
     "reference_checksum": "primaschema:ref:21c16fc69acb3b9e",
-    "reference_file_sha256": "b74b271645e893a879172021e14db7133dba85724cb1907a92628a359cb732ba"
+    "reference_file_sha256": "sha256:b74b271645e893a879172021e14db7133dba85724cb1907a92628a359cb732ba"
 }

@@ -187,7 +187,7 @@ class PrimerScheme(ConfiguredBaseModel):
 
     @field_validator('primer_file_sha256')
     def pattern_primer_file_sha256(cls, v):
-        pattern=re.compile(r"^[a-fA-F0-9]{64}$")
+        pattern=re.compile(r"^sha256:[a-fA-F0-9]{64}$")
         if isinstance(v, list):
             for element in v:
                 if isinstance(element, str) and not pattern.match(element):
@@ -200,7 +200,7 @@ class PrimerScheme(ConfiguredBaseModel):
 
     @field_validator('reference_file_sha256')
     def pattern_reference_file_sha256(cls, v):
-        pattern=re.compile(r"^[a-fA-F0-9]{64}$")
+        pattern=re.compile(r"^sha256:[a-fA-F0-9]{64}$")
         if isinstance(v, list):
             for element in v:
                 if isinstance(element, str) and not pattern.match(element):
@@ -270,7 +270,7 @@ class RefSelection(ConfiguredBaseModel):
 
     @field_validator('file_sha256')
     def pattern_file_sha256(cls, v):
-        pattern=re.compile(r"^[a-fA-F0-9]{64}$")
+        pattern=re.compile(r"^sha256:[a-fA-F0-9]{64}$")
         if isinstance(v, list):
             for element in v:
                 if isinstance(element, str) and not pattern.match(element):
