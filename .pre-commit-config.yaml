@@ -9,3 +9,11 @@ repos:
       # Run the formatter.
       - id: ruff-format
 
+  - repo: local
+    hooks:
+      - id: gen-pydantic
+        name: Generate Pydantic models from LinkML schema
+        entry: bash -c 'uv run gen-pydantic "src/primaschema/schema/info.yml" --meta None > "src/primaschema/schema/info.py"'
+        language: system
+        files: ^src/primaschema/schema/info\.(yml|py)$
+        pass_filenames: false
