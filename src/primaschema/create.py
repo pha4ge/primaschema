@@ -44,7 +44,7 @@ from primaschema.util import (
     primaschema_ref_hash,
     sha256_checksum,
 )
-from primaschema.validate import validate_all
+from primaschema.validate import validate_all, validate as validate_scheme
 
 
 def configure_logging(debug: bool):
@@ -81,9 +81,6 @@ app = App(
 )
 modify_app = App(name="modify", help="Modify fields of an existing primer scheme")
 app.command(modify_app)
-
-validate_app = App(name="validate", help="Validate primer scheme definitions")
-app.command(validate_app)
 
 
 def parse_contributor_single(v: Any) -> Contributor:
@@ -197,7 +194,7 @@ def create_status_badge(primer_scheme: PrimerScheme) -> str:
         case _:
             color = "blue"
 
-    return f"[![Generic badge](https://img.shields.io/badge/STATUS-{primer_scheme.status}-{color}.svg)]"
+    return f"![Generic badge](https://img.shields.io/badge/STATUS-{primer_scheme.status}-{color}.svg)"
 
 
 def generate_readme(path: pathlib.Path, primer_scheme: PrimerScheme):
@@ -769,51 +766,62 @@ def index(
 
 
 # Validate commands
-@validate_app.command
-def all(
-    primer_schemes_path: Annotated[
+@app.command
+def validate(
+    path: Annotated[
         pathlib.Path,
         Parameter(
             env_var="PRIMER_SCHEMES_PATH",
-            validator=validators.Path(exists=True, dir_okay=True, file_okay=False),
-            help="The path to the primer schemes directory. Will use the ENV VAR PRIMER_SCHEMES_PATH",
+            validator=validators.Path(exists=True),
+            help="Path to an info.json file, or a directory of schemes when using --all",
         ),
     ],
+    all: bool = False,
     additional_linkml: bool = False,
     strict: bool = True,
 ):
+    """Validate primer scheme definitions."""
     configure_logging(debug=True)
-    validate_all(primer_schemes_path, additional_linkml, strict)
+    if all:
+        validate_all(path, additional_linkml, strict)
+    else:
+        validate_scheme(path, None, additional_linkml, strict)
 
 
-@app.command
-def regenerate(
-    info_path: Annotated[
-        pathlib.Path,
-        Parameter(validator=validators.Path(exists=True, file_okay=True)),
-    ],
-    reformat_primer_bed: bool = False,
-):
-    """Regenerate and normalise primer scheme metadata"""
+def _regenerate_one(info_path: pathlib.Path, reformat_primer_bed: bool = False):
     ps = PrimerScheme.model_validate_json(info_path.read_text())
     _h, bls = BedLineParser.from_file(info_path.parent / PRIMER_FILE_NAME)
-
-    # Read in the primer.bed
     if reformat_primer_bed:
         bls = sort_bedlines(bls)
         BedLineParser.to_file(info_path.parent / PRIMER_FILE_NAME, _h, bls)
-
     validate_ref_and_bed(bls, str((info_path.parent / REFERENCE_FILE_NAME).absolute()))
-
-    # Regenerate the hashes
     ps.primer_file_sha256 = sha256_checksum(info_path.parent / PRIMER_FILE_NAME)
     ps.reference_file_sha256 = sha256_checksum(info_path.parent / REFERENCE_FILE_NAME)
     ps.primer_checksum = primaschema_bed_hash(None, bls)
     ps.reference_checksum = primaschema_ref_hash(
         info_path.parent / REFERENCE_FILE_NAME, None
     )
-
     _save_and_regenerate(info_path, ps)
+
+
+@app.command
+def regenerate(
+    path: Annotated[
+        pathlib.Path,
+        Parameter(
+            validator=validators.Path(exists=True),
+            help="Path to an info.json file, or a directory of schemes when using --all",
+        ),
+    ],
+    all: bool = False,
+    reformat_primer_bed: bool = False,
+):
+    """Regenerate and normalise primer scheme metadata."""
+    if all:
+        for info_path in find_all_info_json(path):
+            _regenerate_one(info_path, reformat_primer_bed)
+    else:
+        _regenerate_one(path, reformat_primer_bed)
 
 
 if __name__ == "__main__":
