@@ -1,20 +1,20 @@
-from primaschema.schema.info import PrimerScheme
+import enum
 from pathlib import Path
-import linkml.validator
 
-from primaschema import SCHEMA_DIR
-from pydantic_core import from_json
+import linkml.validator
 from primalbedtools.scheme import Scheme
 from primalbedtools.validate import validate_ref_and_bed
+from pydantic_core import from_json
 
 from primaschema import (
     METADATA_FILE_NAME,
-    REFERENCE_FILE_NAME,
     PRIMER_FILE_NAME,
+    REFERENCE_FILE_NAME,
+    SCHEMA_DIR,
     logger,
 )
+from primaschema.schema.info import PrimerScheme
 from primaschema.util import sha256_checksum
-import enum
 
 
 class ValidationEngine(enum.Enum):

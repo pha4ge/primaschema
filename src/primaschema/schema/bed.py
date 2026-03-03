@@ -1,3 +1,5 @@
+from typing import Dict, List, Literal, Optional, Tuple
+
 from pydantic import (
     BaseModel,
     ConfigDict,
@@ -5,7 +7,6 @@ from pydantic import (
     computed_field,
     model_validator,
 )
-from typing import Dict, List, Literal, Optional, Tuple
 
 
 class PrimerModel(BaseModel):
@@ -139,7 +140,7 @@ class BedModel(BaseModel):
                 BedModel.check_overlap(intervals[i], intervals[i - 1])
                 and BedModel.check_overlap(intervals[i], intervals[i + 1])
             ):
-                raise ValueError(f"Amplicons {i-1} and {i} do not overlap")
+                raise ValueError(f"Amplicons {i - 1} and {i} do not overlap")
 
             # Check interval overlaps only with previous and next
             for j in range(n):
