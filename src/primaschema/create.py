@@ -720,7 +720,7 @@ def update_algorithm(
 
 # Index commands
 @app.command
-def build_index(
+def index(
     primer_schemes_path: Annotated[
         pathlib.Path,
         Parameter(
