@@ -28,6 +28,12 @@ uv run pre-commit run --all-files
 
 `uv sync --all-extras` installs optional dependencies, including the `dev` extra (e.g. `pytest`, `pre-commit`, `ruff`) defined in `pyproject.toml`.
 
+The Pydantic model (`src/primaschema/schema/info.py`) is generated from the LinkML schema (`src/primaschema/schema/info.yml`). After modifying the schema, regenerate with:
+
+```shell
+uv run gen-pydantic src/primaschema/schema/info.yml --meta None > src/primaschema/schema/info.py
+```
+
 Some Primaschema commands use components from the [primer-schemes](https://github.com/pha4ge/primer-schemes) repository. To show Primaschema where to find these, create the environment variable `PRIMER_SCHEMES_PATH` pointing to the location of the primer-schemes directory on your machine:
 
 ```shell
