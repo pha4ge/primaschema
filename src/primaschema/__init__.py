@@ -1,14 +1,8 @@
 """Infrastructure for tiled amplicon PCR primer scheme definitions"""
 
 import logging
-import logging.config
 import os
-
 from pathlib import Path
-
-
-__version__ = "1.0.0a0"
-
 
 METADATA_FILE_NAME: str = "info.json"
 PRIMER_FILE_NAME: str = "primer.bed"
@@ -23,36 +17,4 @@ SCHEMA_DIR = PKG_DIR / "src" / "primaschema" / "schema"
 MANIFEST_SCHEMA_PATH = SCHEMA_DIR / "manifest.json"
 MANIFEST_HEADER_PATH = SCHEMA_DIR / "manifest-header.yml"
 
-logging_config = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "formatters": {
-        "default": {
-            "format": "%(name)s %(levelname)s: %(message)s",
-        },
-    },
-    "handlers": {
-        "console": {
-            "class": "logging.StreamHandler",
-            "formatter": "default",
-            "level": "INFO",
-            "stream": "ext://sys.stderr",
-        },
-    },
-    "root": {
-        "handlers": ["console"],
-        "level": "INFO",
-    },
-    "loggers": {
-        "primaschema": {
-            "handlers": ["console"],
-            "level": "INFO",
-            "propagate": False,
-        },
-    },
-}
-
-logging.config.dictConfig(logging_config)
-logger = logging.getLogger("primaschema")
-
-logger.debug(f"{PKG_DIR=} {SCHEMA_DIR=}")
+logging.getLogger("primaschema").addHandler(logging.NullHandler())

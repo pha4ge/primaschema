@@ -18,7 +18,6 @@ from primaschema import (
     METADATA_FILE_NAME,
     PRIMER_FILE_NAME,
     REFERENCE_FILE_NAME,
-    logger,
 )
 from primaschema.lib import plot_primers
 from primaschema.schema.info import (
@@ -38,6 +37,7 @@ from primaschema.schema.manifest import (
     PrimerSchemeIndex,
     update_index,
 )
+from primaschema.setup_logging import LogLevel, configure_logging
 from primaschema.util import (
     find_all_info_json,
     primaschema_bed_hash,
@@ -47,16 +47,7 @@ from primaschema.util import (
 from primaschema.validate import validate as validate_scheme
 from primaschema.validate import validate_all
 
-
-def configure_logging(debug: bool):
-    if debug:
-        logger.setLevel(logging.DEBUG)
-        for handler in logger.handlers:
-            handler.setLevel(logging.DEBUG)
-    else:
-        logger.setLevel(logging.INFO)
-        for handler in logger.handlers:
-            handler.setLevel(logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 LICENSE_TXT_CC_BY_SA_4_0 = """\n\n------------------------------------------------------------------------
@@ -79,7 +70,24 @@ app = App(
     name="primaschema",
     version_flags="--show-version",
     error_console=error_console,
+    default_parameter=Parameter(
+        show_default=True,
+    ),
 )
+
+
+@app.meta.default
+def cli_launcher(
+    *tokens: Annotated[str, Parameter(show=False, allow_leading_hyphen=True)],
+    log_level: Annotated[
+        LogLevel | None,
+        Parameter(name=["--log-level", "-l"], show_default=True),
+    ] = LogLevel.INFO,
+):
+    configure_logging(log_level=log_level)
+    app(tokens)
+
+
 modify_app = App(name="modify", help="Modify fields of an existing primer scheme")
 app.command(modify_app)
 
@@ -146,7 +154,6 @@ def parse_vendor_single(v: Any) -> Vendor:
                 return Vendor(**data)
         except json.JSONDecodeError:
             pass
-
         # Key-value parsing
         if "=" in v:
             parts = {}
@@ -825,5 +832,9 @@ def regenerate(
         _regenerate_one(path, reformat_primer_bed)
 
 
+def main():
+    app.meta()
+
+
 if __name__ == "__main__":
-    app()
+    main()
