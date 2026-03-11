@@ -902,13 +902,25 @@ def validate(
             ps = PrimerScheme.model_validate_json(info_path.read_text())
             scheme_label = f"{ps.name}/{ps.amplicon_size}/{ps.version}"
             logger.debug(f"Validating scheme {scheme_label} from {info_path}")
-            validate_scheme(info_path, ps, additional_linkml, strict)
+            validate_scheme(
+                info_path,
+                ps,
+                additional_linkml,
+                strict,
+                edit_inplace=True,
+            )
             logger.info(f"Validated scheme {scheme_label}")
     else:
         ps = PrimerScheme.model_validate_json(path.read_text())
         scheme_label = f"{ps.name}/{ps.amplicon_size}/{ps.version}"
         logger.debug(f"Validating scheme {scheme_label} from {path}")
-        validate_scheme(path, ps, additional_linkml, strict)
+        validate_scheme(
+            path,
+            ps,
+            additional_linkml,
+            strict,
+            edit_inplace=True,
+        )
         logger.info(f"Validated scheme {scheme_label}")
 
 

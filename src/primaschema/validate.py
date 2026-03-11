@@ -1,13 +1,13 @@
 import enum
 import logging
-from pathlib import Path
 import tempfile
+from pathlib import Path
 
 import linkml.validator
+from Bio import SeqIO
 from primalbedtools.bedfiles import BedLineParser, sort_bedlines
 from primalbedtools.scheme import Scheme
 from primalbedtools.validate import validate_ref_and_bed
-from Bio import SeqIO
 from pydantic_core import from_json
 
 from primaschema import (
@@ -142,7 +142,11 @@ def validate_readme(infopath: Path, primer_scheme: PrimerScheme | None = None):
         )
 
 
-def validate_hashes(infopath: Path, primer_scheme: PrimerScheme | None = None):
+def validate_hashes(
+    infopath: Path,
+    primer_scheme: PrimerScheme | None = None,
+    edit_inplace: bool = False,
+):
     # Use provided PrimerScheme (prevent duplication) or read in for validation
     if primer_scheme is None:
         primer_scheme = PrimerScheme.model_validate_json(infopath.read_text())
@@ -175,10 +179,11 @@ def validate_hashes(infopath: Path, primer_scheme: PrimerScheme | None = None):
             )
 
         if reformatted_sha == primer_scheme.primer_file_sha256:
-            BedLineParser.to_file(primer_path, header, bedlines)
+            if edit_inplace:
+                BedLineParser.to_file(primer_path, header, bedlines)
             primer_sha = reformatted_sha
             logger.warning(
-                f"primer.bed reformatted to match expected sha256 for {scheme_subpath}; file replaced."
+                f"primer.bed reformatted to match expected sha256 for {scheme_subpath}."
             )
         else:
             raise ValueError(
@@ -207,11 +212,12 @@ def validate_hashes(infopath: Path, primer_scheme: PrimerScheme | None = None):
             )
 
         if reformatted_sha == primer_scheme.reference_file_sha256:
-            with open(reference_path, "w") as ref_file:
-                SeqIO.write(reference_records, ref_file, "fasta")
+            if edit_inplace:
+                with open(reference_path, "w") as ref_file:
+                    SeqIO.write(reference_records, ref_file, "fasta")
             reference_sha = reformatted_sha
             logger.warning(
-                f"reference.fasta reformatted to match expected sha256 for {scheme_subpath}; file replaced."
+                f"reference.fasta reformatted to match expected sha256 for {scheme_subpath}."
             )
         else:
             raise ValueError(
@@ -226,6 +232,7 @@ def validate(
     primer_scheme: PrimerScheme | None = None,
     additional_linkml: bool = False,
     strict: bool = False,
+    edit_inplace: bool = False,
 ):
     logger.debug(f"Validating {'strict' if strict else ''} {infopath}")
     if additional_linkml:
@@ -252,7 +259,7 @@ def validate(
     logger.debug(f"Validated primer.bed files:  {infopath}")
 
     # Validate hashes
-    validate_hashes(infopath, primer_scheme)
+    validate_hashes(infopath, primer_scheme, edit_inplace=edit_inplace)
     validate_readme(infopath, primer_scheme)
     logger.debug(f"Validated hashes and README:  {infopath}")
 
