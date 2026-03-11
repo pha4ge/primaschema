@@ -442,7 +442,7 @@ def create(
         ),
     ] = None,
 ):
-    """Create a new primer scheme definition."""
+    """Create a new primer scheme definition"""
     # Parse algorithm if provided
     if algorithm:
         cli_ps.algorithm = parse_algorithm(algorithm)
@@ -859,7 +859,7 @@ def index(
     index_path: Optional[pathlib.Path] = None,
     base_url: str = "",
 ):
-    """Build a JSON index of all primer schemes in a directory."""
+    """Build a JSON index of all primer schemes in a directory"""
     # Read in current index
     if index_path is not None:
         psi = PrimerSchemeIndex.model_validate_json(index_path.read_text())
@@ -902,7 +902,7 @@ def validate(
         ),
     ] = False,
 ):
-    """Validate primer scheme definitions."""
+    """Validate primer scheme definitions"""
     if all:
         logger.debug(f"Validating all schemes under {path}")
         errors: list[str] = []
@@ -1027,7 +1027,7 @@ def rebuild(
         ),
     ] = True,
 ):
-    """Rebuild and normalise primer scheme metadata."""
+    """Rebuild and normalise primer scheme metadata"""
     if all:
         for info_path in find_all_info_json(path):
             scheme_label = _rebuild_one(
