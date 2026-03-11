@@ -212,7 +212,7 @@ def test_subset():
 
 def test_dev_scheme():
     lib.validate(data_dir / "dev-scheme")
-    lib.validate(data_dir / "dev-scheme", full=True, rebuild=True)
+    lib.validate(data_dir / "dev-scheme", full=True)
 
 
 def test_cli_create():
