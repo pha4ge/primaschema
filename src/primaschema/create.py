@@ -6,7 +6,6 @@ import sys
 import tempfile
 from typing import Annotated, Any, List, Optional
 
-from Bio import SeqIO
 from cyclopts import App, Parameter, validators
 from primalbedtools.bedfiles import BedLineParser, sort_bedlines
 from primalbedtools.validate import validate_ref_and_bed
@@ -42,7 +41,9 @@ from primaschema.util import (
     find_all_info_json,
     primaschema_bed_hash,
     primaschema_ref_hash,
+    read_fasta_records,
     sha256_checksum,
+    write_fasta_records,
 )
 from primaschema.validate import validate as validate_scheme
 
@@ -471,9 +472,8 @@ def create(
         # Move / Write the bedfile
         BedLineParser.to_file(tmp_version_level / PRIMER_FILE_NAME, _headers, bedlines)
         # Parse ref
-        reference_records = list(SeqIO.parse(reference_path, "fasta"))
-        with open(tmp_version_level / REFERENCE_FILE_NAME, "w") as ref_file:
-            SeqIO.write(reference_records, ref_file, "fasta")
+        reference_records = read_fasta_records(reference_path)
+        write_fasta_records(tmp_version_level / REFERENCE_FILE_NAME, reference_records)
 
         # Validate the bed and ref files files
         validate_ref_and_bed(

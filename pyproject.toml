@@ -26,8 +26,8 @@ classifiers = [
 ]
 dependencies = [
     "altair>=5.3.0",
-    "biopython>=1.80",
     "cyclopts>=4.3.0",
+    "dnaio>=1.2.4",
     "jsonschema",
     "linkml>=1.9.4",
     "natsort>=8.4.0",

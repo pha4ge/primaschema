@@ -1,7 +1,7 @@
 from hashlib import sha256
 from pathlib import Path
 
-from Bio import SeqIO
+import dnaio
 from primalbedtools.bedfiles import BedLine, BedLineParser, sort_bedlines
 
 from primaschema import METADATA_FILE_NAME
@@ -18,6 +18,25 @@ def sha256_checksum(filename: Path):
         for block in iter(lambda: f.read(4096), b""):
             sha256_hasher.update(block)
     return f"sha256:{sha256_hasher.hexdigest()}"
+
+
+def read_fasta_records(path: Path) -> list[dnaio.SequenceRecord]:
+    with dnaio.open(path) as reader:
+        return list(reader)
+
+
+def write_fasta_records(
+    path: Path,
+    records: list[dnaio.SequenceRecord],
+    line_length: int = 60,
+) -> None:
+    with dnaio.FastaWriter(path, line_length=line_length) as writer:
+        for record in records:
+            writer.write(record)
+
+
+def reverse_complement(sequence: str) -> str:
+    return dnaio.SequenceRecord("sequence", sequence).reverse_complement().sequence
 
 
 def primaschema_bed_hash(
@@ -58,7 +77,7 @@ def primaschema_ref_hash(
         raise ValueError("Please provide either an path or SeqRecords to hash")
 
     if seq_records is None:
-        seq_records = list(SeqIO.parse(ref_path, "fasta"))
+        seq_records = read_fasta_records(ref_path)
 
     # Sort by id
     seq_records.sort(key=lambda x: x.id)
@@ -66,7 +85,7 @@ def primaschema_ref_hash(
     hasher = sha256()
     for record in seq_records:
         hasher.update(record.id.strip().upper().encode())
-        hasher.update(str(record.seq.upper()).encode())
+        hasher.update(str(record.sequence).upper().encode())
 
     # return truncated hash
     return f"primaschema:ref:{hasher.hexdigest()[:16]}"

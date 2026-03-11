@@ -4,7 +4,6 @@ import tempfile
 from pathlib import Path
 
 import linkml.validator
-from Bio import SeqIO
 from primalbedtools.bedfiles import BedLineParser, sort_bedlines
 from primalbedtools.scheme import Scheme
 from primalbedtools.validate import validate_ref_and_bed
@@ -17,7 +16,7 @@ from primaschema import (
     SCHEMA_DIR,
 )
 from primaschema.schema.info import PrimerScheme
-from primaschema.util import sha256_checksum
+from primaschema.util import read_fasta_records, sha256_checksum, write_fasta_records
 
 logger = logging.getLogger(__name__)
 
@@ -170,9 +169,11 @@ def validate_hashes(
             bedlines = sort_bedlines(bedlines)
             with tempfile.NamedTemporaryFile("w", delete=False) as tmp:
                 tmp_path = Path(tmp.name)
-            BedLineParser.to_file(tmp_path, header, bedlines)
-            reformatted_sha = sha256_checksum(tmp_path)
-            tmp_path.unlink(missing_ok=True)
+            try:
+                BedLineParser.to_file(tmp_path, header, bedlines)
+                reformatted_sha = sha256_checksum(tmp_path)
+            finally:
+                tmp_path.unlink(missing_ok=True)
         except Exception as exc:
             logger.warning(
                 f"Failed to normalize primer.bed for {scheme_subpath}: {exc}"
@@ -199,13 +200,14 @@ def validate_hashes(
         )
         reformatted_sha = None
         try:
-            reference_records = list(SeqIO.parse(reference_path, "fasta"))
+            reference_records = read_fasta_records(reference_path)
             with tempfile.NamedTemporaryFile("w", delete=False) as tmp:
                 tmp_path = Path(tmp.name)
-            with open(tmp_path, "w") as ref_file:
-                SeqIO.write(reference_records, ref_file, "fasta")
-            reformatted_sha = sha256_checksum(tmp_path)
-            tmp_path.unlink(missing_ok=True)
+            try:
+                write_fasta_records(tmp_path, reference_records)
+                reformatted_sha = sha256_checksum(tmp_path)
+            finally:
+                tmp_path.unlink(missing_ok=True)
         except Exception as exc:
             logger.warning(
                 f"Failed to normalize reference.fasta for {scheme_subpath}: {exc}"
@@ -213,8 +215,7 @@ def validate_hashes(
 
         if reformatted_sha == primer_scheme.reference_file_sha256:
             if edit_inplace:
-                with open(reference_path, "w") as ref_file:
-                    SeqIO.write(reference_records, ref_file, "fasta")
+                write_fasta_records(reference_path, reference_records)
             reference_sha = reformatted_sha
             logger.warning(
                 f"reference.fasta reformatted to match expected sha256 for {scheme_subpath}."
