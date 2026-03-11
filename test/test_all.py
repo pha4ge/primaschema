@@ -1,11 +1,13 @@
+import shutil
 import subprocess
-
 from pathlib import Path
 
 import pytest
 
 import primaschema.lib as lib
-
+import primaschema.validate as validate_module
+from primaschema.schema.info import PrimerScheme
+from primaschema.util import sha256_checksum
 
 data_dir = Path("test/data")
 
@@ -40,9 +42,13 @@ def test_hash_bed():
     )
 
 
-def test_build_manifest():
-    lib.build_manifest(root_dir=data_dir / "primer-schemes")
-    run("rm -rf built index.json", cwd="./")
+def test_build_manifest(tmp_path: Path):
+    src = data_dir / "primer-schemes"
+    dest = tmp_path / "primer-schemes"
+    shutil.copytree(src, dest)
+    lib.build_manifest(root_dir=dest, out_dir=tmp_path)
+    manifest_path = tmp_path / "index.json"
+    assert manifest_path.exists()
 
 
 def test_primer_bed_to_scheme_bed():
@@ -139,6 +145,46 @@ MN908947.3	408	431	SARS-CoV-2_1_RIGHT_1	1	-	CTTCTACTAAGCCACAAGTGCCA
 MN908947.3	324	344	SARS-CoV-2_2_LEFT_1	2	+	TTTACAGGTTCGCGACGTGC
 MN908947.3	705	727	SARS-CoV-2_2_RIGHT_1	2	-	ATAAGGATCAGTGCCAAGCTCG"""
     )
+
+
+def _copy_scheme(tmp_path: Path, rel_path: str) -> Path:
+    src = data_dir / rel_path
+    dest = tmp_path / rel_path
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(src, dest)
+    return dest
+
+
+def test_validate_autonormalize_primer_bed(tmp_path: Path):
+    scheme_dir = _copy_scheme(
+        tmp_path,
+        "auto-normalisation/test/400/v2.0.0",
+    )
+    info_path = scheme_dir / "info.json"
+    primer_path = scheme_dir / "primer.bed"
+    primer_scheme = PrimerScheme.model_validate_json(info_path.read_text())
+
+    assert sha256_checksum(primer_path) != primer_scheme.primer_file_sha256
+
+    validate_module.validate(info_path, strict=True)
+
+    assert sha256_checksum(primer_path) == primer_scheme.primer_file_sha256
+
+
+def test_validate_autonormalize_reference_fasta(tmp_path: Path):
+    scheme_dir = _copy_scheme(
+        tmp_path,
+        "auto-normalisation/test/400/v2.0.0",
+    )
+    info_path = scheme_dir / "info.json"
+    reference_path = scheme_dir / "reference.fasta"
+    primer_scheme = PrimerScheme.model_validate_json(info_path.read_text())
+
+    assert sha256_checksum(reference_path) != primer_scheme.reference_file_sha256
+
+    validate_module.validate(info_path, strict=True)
+
+    assert sha256_checksum(reference_path) == primer_scheme.reference_file_sha256
 
 
 def test_invalid_missing_field():
