@@ -39,6 +39,16 @@ _BASE_LOGGING_CONFIG = {
             "level": "INFO",
             "propagate": False,
         },
+        "linkml": {
+            "handlers": ["console"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+        "linkml_runtime": {
+            "handlers": ["console"],
+            "level": "WARNING",
+            "propagate": False,
+        },
     },
 }
 
@@ -58,9 +68,7 @@ def _resolve_level(log_level: LogLevel | str | None) -> int:
     return numeric_level
 
 
-def configure_logging(
-    log_level: LogLevel | str | None = None,
-) -> int:
+def configure_logging(log_level: LogLevel | str | None = None) -> int:
     """Configure primaschema logging.
 
     If log_level is provided it takes precedence over verbose.
@@ -72,5 +80,10 @@ def configure_logging(
     logger.setLevel(numeric_level)
     for handler in logger.handlers:
         handler.setLevel(numeric_level)
+
+    # Degrade linkml info logging to debug
+    linkml_level = logging.DEBUG if numeric_level <= logging.DEBUG else logging.WARNING
+    for logger_name in ("linkml", "linkml_runtime"):
+        logging.getLogger(logger_name).setLevel(linkml_level)
 
     return numeric_level
