@@ -14,7 +14,7 @@ from primaschema.schema.info import (
 )
 
 
-class ManifestPrimerScheme(BaseModel):
+class IndexPrimerScheme(BaseModel):
     """
     A subset of PrimerScheme for the index, with additional fields.
     """
@@ -93,8 +93,8 @@ class ManifestPrimerScheme(BaseModel):
     @classmethod
     def from_primer_scheme(
         cls, scheme: PrimerScheme, base_url: str = ""
-    ) -> "ManifestPrimerScheme":
-        """Create a ManifestPrimerScheme from a PrimerScheme instance."""
+    ) -> "IndexPrimerScheme":
+        """Create an IndexPrimerScheme from a PrimerScheme instance."""
         return cls(
             name=scheme.name,
             amplicon_size=scheme.amplicon_size,
@@ -116,12 +116,12 @@ class PrimerSchemeIndex(ConfiguredBaseModel):
     An index of primer schemes.
     """
 
-    primerschemes: dict[str, dict[int, dict[str, ManifestPrimerScheme]]] = Field(
+    primerschemes: dict[str, dict[int, dict[str, IndexPrimerScheme]]] = Field(
         default_factory=dict,
         description="Index of primer schemes structured as {name: {amplicon_size: {version: scheme}}}",
     )
 
-    def add_manifest_primer_scheme(self, manifest: ManifestPrimerScheme, strict=True):
+    def add_index_primer_scheme(self, manifest: IndexPrimerScheme, strict=True):
         # Get or create the substructure
         name_level = self.primerschemes.setdefault(manifest.name, {})
         amplicon_size_level = name_level.setdefault(manifest.amplicon_size, {})
@@ -148,7 +148,7 @@ class PrimerSchemeIndex(ConfiguredBaseModel):
             # new scheme
             amplicon_size_level[manifest.version] = manifest
 
-    def remove_manifest_primer_scheme(self, manifest: ManifestPrimerScheme) -> bool:
+    def remove_index_primer_scheme(self, manifest: IndexPrimerScheme) -> bool:
         # Early return if not present
         name_level = self.primerschemes.get(manifest.name)
         if name_level is None:
@@ -166,7 +166,7 @@ class PrimerSchemeIndex(ConfiguredBaseModel):
         return False
 
     def prune_index(self):
-        """Removes any stem without a manifest"""
+        """Removes any empty stems"""
         # Iterate over a copy of keys to allow modification during iteration
         for name in list(self.primerschemes.keys()):
             name_level = self.primerschemes[name]
@@ -189,9 +189,9 @@ def create_index(
     psi = PrimerSchemeIndex()
 
     for ps in primer_schemes:
-        # Convert to manifest
-        mps = ManifestPrimerScheme.from_primer_scheme(ps, base_url=base_url)
-        psi.add_manifest_primer_scheme(mps)
+        # Convert to index entry
+        mps = IndexPrimerScheme.from_primer_scheme(ps, base_url=base_url)
+        psi.add_index_primer_scheme(mps)
     return psi
 
 
@@ -203,5 +203,5 @@ def update_index(
 ):
     for ps in primer_schemes:
         # Convert to manifest
-        mps = ManifestPrimerScheme.from_primer_scheme(ps, base_url=base_url)
-        index.add_manifest_primer_scheme(mps, strict)
+        mps = IndexPrimerScheme.from_primer_scheme(ps, base_url=base_url)
+        index.add_index_primer_scheme(mps, strict)

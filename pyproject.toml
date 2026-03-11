@@ -39,8 +39,8 @@ dependencies = [
 ]
 
 [project.scripts]
-primaschema = "primaschema.create:main"
-new = "primaschema.create:main"
+primaschema = "primaschema.cli:main"
+new = "primaschema.cli:main"
 
 [project.urls]
 Home = "https://github.com/pha4ge/primaschema"

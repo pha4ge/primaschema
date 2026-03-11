@@ -32,7 +32,7 @@ from primaschema.schema.info import (
 from primaschema.schema.info import (
     version as SCHEMA_VERSION,
 )
-from primaschema.schema.manifest import (
+from primaschema.schema.index import (
     PrimerSchemeIndex,
     update_index,
 )
@@ -856,13 +856,13 @@ def index(
             help="The path to the primer schemes directory. Will use the ENV VAR PRIMER_SCHEMES_PATH",
         ),
     ],
-    manifest_path: Optional[pathlib.Path] = None,
+    index_path: Optional[pathlib.Path] = None,
     base_url: str = "",
 ):
     """Build a JSON index of all primer schemes in a directory."""
-    # Read in current manifest
-    if manifest_path is not None:
-        psi = PrimerSchemeIndex.model_validate_json(manifest_path.read_text())
+    # Read in current index
+    if index_path is not None:
+        psi = PrimerSchemeIndex.model_validate_json(index_path.read_text())
     else:
         psi = PrimerSchemeIndex()
 
@@ -977,7 +977,7 @@ def _sync_metadata_from_path(
     return changed
 
 
-def _regenerate_one(
+def _rebuild_one(
     info_path: pathlib.Path,
     reformat_primer_bed: bool = False,
     sync_metadata: bool = True,
@@ -1009,7 +1009,7 @@ def _regenerate_one(
 
 
 @app.command
-def regenerate(
+def rebuild(
     path: Annotated[
         pathlib.Path,
         Parameter(
@@ -1027,22 +1027,22 @@ def regenerate(
         ),
     ] = True,
 ):
-    """Regenerate and normalise primer scheme metadata."""
+    """Rebuild and normalise primer scheme metadata."""
     if all:
         for info_path in find_all_info_json(path):
-            scheme_label = _regenerate_one(
+            scheme_label = _rebuild_one(
                 info_path,
                 reformat_primer_bed=reformat_primer_bed,
                 sync_metadata=sync_metadata,
             )
-            logger.info(f"Regenerated scheme {scheme_label}")
+            logger.info(f"Rebuilt scheme {scheme_label}")
     else:
-        scheme_label = _regenerate_one(
+        scheme_label = _rebuild_one(
             path,
             reformat_primer_bed=reformat_primer_bed,
             sync_metadata=sync_metadata,
         )
-        logger.info(f"Regenerated scheme {scheme_label}")
+        logger.info(f"Rebuilt scheme {scheme_label}")
 
 
 def main():

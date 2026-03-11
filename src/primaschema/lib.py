@@ -14,7 +14,7 @@ import yaml
 from linkml.generators.pydanticgen import PydanticGenerator
 
 from primaschema import (
-    MANIFEST_HEADER_PATH,
+    INDEX_HEADER_PATH,
     SCHEMA_DIR,
 )
 from primaschema.schema import bed, info
@@ -356,12 +356,12 @@ def get_scheme_cname(scheme: dict, sep: Literal["/", "_"] = "/") -> str:
     return sep.join(parts)
 
 
-def build_manifest(root_dir: Path, out_dir: Path = Path()):
-    """Build manifest of schemes inside the specified directory"""
+def build_index(root_dir: Path, out_dir: Path = Path()):
+    """Build index of schemes inside the specified directory"""
 
-    manifest = parse_yaml(MANIFEST_HEADER_PATH)
+    index_data = parse_yaml(INDEX_HEADER_PATH)
 
-    manifest_field_exclude = [
+    field_exclude = [
         "schema_version",
     ]
 
@@ -370,10 +370,10 @@ def build_manifest(root_dir: Path, out_dir: Path = Path()):
         scheme_path = root_dir
 
     schemes = []
-    organism_set = set([o["organism"] for o in manifest["organisms"]])
+    organism_set = set([o["organism"] for o in index_data["organisms"]])
     for scheme_info_path in scheme_path.glob("**/info.yml"):
         scheme = parse_yaml(scheme_info_path)
-        for field in manifest_field_exclude:
+        for field in field_exclude:
             if field in scheme:
                 del scheme[field]
         if scheme["organism"] not in organism_set:
@@ -382,12 +382,12 @@ def build_manifest(root_dir: Path, out_dir: Path = Path()):
             )
         schemes.append(scheme)
 
-    manifest["schemes"] = sorted(schemes, key=get_scheme_cname)
+    index_data["schemes"] = sorted(schemes, key=get_scheme_cname)
 
-    manifest_file_name = "index.json"
-    with open(out_dir / manifest_file_name, "w") as fh:
-        logger.info(f"Writing {manifest_file_name} to {out_dir}/{manifest_file_name}")
-        json.dump(manifest, fh, indent=4)
+    index_file_name = "index.json"
+    with open(out_dir / index_file_name, "w") as fh:
+        logger.info(f"Writing {index_file_name} to {out_dir}/{index_file_name}")
+        json.dump(index_data, fh, indent=4)
 
 
 def amplicon_intervals(bed_path: Path) -> Dict[str, Dict[str, Tuple[int, int]]]:

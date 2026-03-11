@@ -14,7 +14,7 @@ PKG_DIR = Path(
     )
 )
 SCHEMA_DIR = PKG_DIR / "src" / "primaschema" / "schema"
-MANIFEST_SCHEMA_PATH = SCHEMA_DIR / "manifest.json"
-MANIFEST_HEADER_PATH = SCHEMA_DIR / "manifest-header.yml"
+INDEX_SCHEMA_PATH = SCHEMA_DIR / "manifest.json"
+INDEX_HEADER_PATH = SCHEMA_DIR / "index-header.yml"
 
 logging.getLogger("primaschema").addHandler(logging.NullHandler())

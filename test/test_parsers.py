@@ -1,6 +1,6 @@
 import pytest
 
-from primaschema.create import (
+from primaschema.cli import (
     parse_algorithm,
     parse_contributor_single,
     parse_contributors_pydantic,

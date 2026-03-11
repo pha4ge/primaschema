@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-import primaschema.create as create_module
+import primaschema.cli as create_module
 import primaschema.lib as lib
 import primaschema.validate as validate_module
 from primaschema.schema.info import PrimerScheme
@@ -43,13 +43,13 @@ def test_hash_bed():
     )
 
 
-def test_build_manifest(tmp_path: Path):
+def test_build_index(tmp_path: Path):
     src = data_dir / "primer-schemes"
     dest = tmp_path / "primer-schemes"
     shutil.copytree(src, dest)
-    lib.build_manifest(root_dir=dest, out_dir=tmp_path)
-    manifest_path = tmp_path / "index.json"
-    assert manifest_path.exists()
+    lib.build_index(root_dir=dest, out_dir=tmp_path)
+    index_path = tmp_path / "index.json"
+    assert index_path.exists()
 
 
 def test_primer_bed_to_scheme_bed():
@@ -277,7 +277,7 @@ def test_cli_create():
     run("rm -rf built/artic", cwd="./")
 
 
-def test_regenerate_syncs_metadata_from_path(tmp_path: Path):
+def test_rebuild_syncs_metadata_from_path(tmp_path: Path):
     src = data_dir / "auto-normalisation/test/400/v2.0.0"
     dest = tmp_path / "artic-sars-cov-2" / "1200" / "v9.9.9"
     dest.parent.mkdir(parents=True, exist_ok=True)
@@ -288,9 +288,9 @@ def test_regenerate_syncs_metadata_from_path(tmp_path: Path):
     assert primer_scheme.amplicon_size != 1200
     assert primer_scheme.version != "v9.9.9"
 
-    from primaschema.create import _regenerate_one
+    from primaschema.cli import _rebuild_one
 
-    _regenerate_one(info_path, sync_metadata=True)
+    _rebuild_one(info_path, sync_metadata=True)
 
     updated_scheme = PrimerScheme.model_validate_json(info_path.read_text())
     assert updated_scheme.name == "artic-sars-cov-2"
