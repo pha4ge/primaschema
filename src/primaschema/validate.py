@@ -188,7 +188,7 @@ def validate_hashes(
             )
         else:
             raise ValueError(
-                f"File sha256 ({primer_sha} != info sha256 ({primer_scheme.primer_file_sha256}): {scheme_subpath}"
+                f"{PRIMER_FILE_NAME} sha256 ({primer_sha} != info sha256 ({primer_scheme.primer_file_sha256}): {scheme_subpath}"
             )
 
     # Check sha256 hash ref
@@ -222,7 +222,7 @@ def validate_hashes(
             )
         else:
             raise ValueError(
-                f"File sha256 ({reference_sha} != info sha256 ({primer_scheme.reference_file_sha256}): {scheme_subpath}"
+                f"{REFERENCE_FILE_NAME} sha256 ({reference_sha} != info sha256 ({primer_scheme.reference_file_sha256}): {scheme_subpath}"
             )
 
     # TODO Check primaschema hashes.
@@ -272,5 +272,14 @@ def validate_all(
     Recursively searches through the primer_schemes_path for {METADATA_FILE_NAME}
     """
 
+    errors: list[str] = []
     for schemeinfo in primer_schemes_path.rglob(f"*/{METADATA_FILE_NAME}"):
-        validate(schemeinfo, None, additional_linkml, strict)
+        try:
+            validate(schemeinfo, None, additional_linkml, strict)
+        except Exception as exc:
+            logger.error(f"Validation failed for {schemeinfo}: {exc}")
+            errors.append(f"{schemeinfo}: {exc}")
+    if errors:
+        raise ValueError(
+            f"Validation failed for {len(errors)} scheme(s):\n" + "\n".join(errors)
+        )

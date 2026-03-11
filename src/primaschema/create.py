@@ -898,18 +898,27 @@ def validate(
     """Validate primer scheme definitions."""
     if all:
         logger.debug(f"Validating all schemes under {path}")
+        errors: list[str] = []
         for info_path in find_all_info_json(path):
             ps = PrimerScheme.model_validate_json(info_path.read_text())
             scheme_label = f"{ps.name}/{ps.amplicon_size}/{ps.version}"
             logger.debug(f"Validating scheme {scheme_label} from {info_path}")
-            validate_scheme(
-                info_path,
-                ps,
-                additional_linkml,
-                strict,
-                edit_inplace=True,
+            try:
+                validate_scheme(
+                    info_path,
+                    ps,
+                    additional_linkml,
+                    strict,
+                    edit_inplace=True,
+                )
+                logger.info(f"Validated scheme {scheme_label}")
+            except Exception as exc:
+                logger.error(f"Validation failed for {info_path}: {exc}")
+                errors.append(f"{info_path}: {exc}")
+        if errors:
+            raise ValueError(
+                f"Validation failed for {len(errors)} scheme(s):\n" + "\n".join(errors)
             )
-            logger.info(f"Validated scheme {scheme_label}")
     else:
         ps = PrimerScheme.model_validate_json(path.read_text())
         scheme_label = f"{ps.name}/{ps.amplicon_size}/{ps.version}"
@@ -924,8 +933,52 @@ def validate(
         logger.info(f"Validated scheme {scheme_label}")
 
 
-def _regenerate_one(info_path: pathlib.Path, reformat_primer_bed: bool = False) -> str:
+def _sync_metadata_from_path(
+    primer_scheme: PrimerScheme, info_path: pathlib.Path
+) -> bool:
+    scheme_dir = info_path.parent
+    version = scheme_dir.name
+    amplicon_size_raw = scheme_dir.parent.name
+    name = scheme_dir.parent.parent.name
+
+    try:
+        amplicon_size = int(amplicon_size_raw)
+    except ValueError as exc:
+        raise ValueError(
+            f"Invalid amplicon size in path {scheme_dir}: {amplicon_size_raw}"
+        ) from exc
+
+    changed = False
+    if primer_scheme.name != name:
+        logger.debug(
+            f"Syncing scheme name from {primer_scheme.name} to {name} for {info_path}"
+        )
+        primer_scheme.name = name
+        changed = True
+    if primer_scheme.amplicon_size != amplicon_size:
+        logger.debug(
+            f"Syncing amplicon_size from {primer_scheme.amplicon_size} to {amplicon_size} for {info_path}"
+        )
+        primer_scheme.amplicon_size = amplicon_size
+        changed = True
+    if primer_scheme.version != version:
+        logger.debug(
+            f"Syncing version from {primer_scheme.version} to {version} for {info_path}"
+        )
+        primer_scheme.version = version
+        changed = True
+    return changed
+
+
+def _regenerate_one(
+    info_path: pathlib.Path,
+    reformat_primer_bed: bool = False,
+    sync_metadata: bool = True,
+) -> str:
     ps = PrimerScheme.model_validate_json(info_path.read_text())
+    if sync_metadata:
+        if _sync_metadata_from_path(ps, info_path):
+            logger.debug(f"Synced scheme metadata from path for {info_path}")
     scheme_label = f"{ps.name}/{ps.amplicon_size}/{ps.version}"
     logger.debug(f"Loaded scheme {scheme_label} from {info_path}")
     _h, bls = BedLineParser.from_file(info_path.parent / PRIMER_FILE_NAME)
@@ -959,14 +1012,29 @@ def regenerate(
     ],
     all: bool = False,
     reformat_primer_bed: bool = False,
+    sync_metadata: Annotated[
+        bool,
+        Parameter(
+            name="--sync-metadata",
+            help="Sync name/amplicon_size/version from the scheme path",
+        ),
+    ] = True,
 ):
     """Regenerate and normalise primer scheme metadata."""
     if all:
         for info_path in find_all_info_json(path):
-            scheme_label = _regenerate_one(info_path, reformat_primer_bed)
+            scheme_label = _regenerate_one(
+                info_path,
+                reformat_primer_bed=reformat_primer_bed,
+                sync_metadata=sync_metadata,
+            )
             logger.info(f"Regenerated scheme {scheme_label}")
     else:
-        scheme_label = _regenerate_one(path, reformat_primer_bed)
+        scheme_label = _regenerate_one(
+            path,
+            reformat_primer_bed=reformat_primer_bed,
+            sync_metadata=sync_metadata,
+        )
         logger.info(f"Regenerated scheme {scheme_label}")
 
 
