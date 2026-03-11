@@ -144,7 +144,7 @@ def validate_readme(infopath: Path, primer_scheme: PrimerScheme | None = None):
 def validate_hashes(
     infopath: Path,
     primer_scheme: PrimerScheme | None = None,
-    edit_inplace: bool = False,
+    fix: bool = False,
 ):
     # Use provided PrimerScheme (prevent duplication) or read in for validation
     if primer_scheme is None:
@@ -180,12 +180,16 @@ def validate_hashes(
             )
 
         if reformatted_sha == primer_scheme.primer_file_sha256:
-            if edit_inplace:
+            if fix:
                 BedLineParser.to_file(primer_path, header, bedlines)
-            primer_sha = reformatted_sha
-            logger.warning(
-                f"primer.bed reformatted to match expected sha256 for {scheme_subpath}."
-            )
+                primer_sha = reformatted_sha
+                logger.warning(
+                    f"primer.bed reformatted to match expected sha256 for {scheme_subpath}."
+                )
+            else:
+                raise ValueError(
+                    f"{PRIMER_FILE_NAME} sha256 mismatch for {scheme_subpath} (normalizable; rerun with --fix)"
+                )
         else:
             raise ValueError(
                 f"{PRIMER_FILE_NAME} sha256 ({primer_sha} != info sha256 ({primer_scheme.primer_file_sha256}): {scheme_subpath}"
@@ -214,12 +218,16 @@ def validate_hashes(
             )
 
         if reformatted_sha == primer_scheme.reference_file_sha256:
-            if edit_inplace:
+            if fix:
                 write_fasta_records(reference_path, reference_records)
-            reference_sha = reformatted_sha
-            logger.warning(
-                f"reference.fasta reformatted to match expected sha256 for {scheme_subpath}."
-            )
+                reference_sha = reformatted_sha
+                logger.warning(
+                    f"reference.fasta reformatted to match expected sha256 for {scheme_subpath}."
+                )
+            else:
+                raise ValueError(
+                    f"{REFERENCE_FILE_NAME} sha256 mismatch for {scheme_subpath} (normalizable; rerun with --fix)"
+                )
         else:
             raise ValueError(
                 f"{REFERENCE_FILE_NAME} sha256 ({reference_sha} != info sha256 ({primer_scheme.reference_file_sha256}): {scheme_subpath}"
@@ -233,7 +241,7 @@ def validate(
     primer_scheme: PrimerScheme | None = None,
     additional_linkml: bool = False,
     strict: bool = False,
-    edit_inplace: bool = False,
+    fix: bool = False,
 ):
     logger.debug(f"Validating {'strict' if strict else ''} {infopath}")
     if additional_linkml:
@@ -260,7 +268,7 @@ def validate(
     logger.debug(f"Validated primer.bed files:  {infopath}")
 
     # Validate hashes
-    validate_hashes(infopath, primer_scheme, edit_inplace=edit_inplace)
+    validate_hashes(infopath, primer_scheme, fix=fix)
     validate_readme(infopath, primer_scheme)
     logger.debug(f"Validated hashes and README:  {infopath}")
 

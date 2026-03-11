@@ -894,6 +894,13 @@ def validate(
     all: bool = False,
     additional_linkml: bool = False,
     strict: bool = True,
+    fix: Annotated[
+        bool,
+        Parameter(
+            name="--fix",
+            help="Normalise primer.bed and reference.fasta in place if they differ only by formatting",
+        ),
+    ] = False,
 ):
     """Validate primer scheme definitions."""
     if all:
@@ -909,7 +916,7 @@ def validate(
                     ps,
                     additional_linkml,
                     strict,
-                    edit_inplace=True,
+                    fix=fix,
                 )
                 logger.info(f"Validated scheme {scheme_label}")
             except Exception as exc:
@@ -928,7 +935,7 @@ def validate(
             ps,
             additional_linkml,
             strict,
-            edit_inplace=True,
+            fix=fix,
         )
         logger.info(f"Validated scheme {scheme_label}")
 
