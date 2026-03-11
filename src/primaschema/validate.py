@@ -161,7 +161,7 @@ def validate_hashes(
     primer_sha = sha256_checksum(primer_path)
     if primer_sha != primer_scheme.primer_file_sha256:
         logger.warning(
-            f"primer.bed sha256 mismatch for {scheme_subpath}. Attempting to normalize and recheck."
+            f"primer.bed sha256 mismatch for {scheme_subpath}. Attempting to normalise and recheck."
         )
         reformatted_sha = None
         try:
@@ -176,7 +176,7 @@ def validate_hashes(
                 tmp_path.unlink(missing_ok=True)
         except Exception as exc:
             logger.warning(
-                f"Failed to normalize primer.bed for {scheme_subpath}: {exc}"
+                f"Failed to normalise primer.bed for {scheme_subpath}: {exc}"
             )
 
         if reformatted_sha == primer_scheme.primer_file_sha256:
@@ -188,7 +188,7 @@ def validate_hashes(
                 )
             else:
                 raise ValueError(
-                    f"{PRIMER_FILE_NAME} sha256 mismatch for {scheme_subpath} (normalizable; rerun with --fix)"
+                    f"{PRIMER_FILE_NAME} sha256 mismatch for {scheme_subpath} (normalisable; rerun with --fix)"
                 )
         else:
             raise ValueError(
@@ -200,7 +200,7 @@ def validate_hashes(
     reference_sha = sha256_checksum(reference_path)
     if reference_sha != primer_scheme.reference_file_sha256:
         logger.warning(
-            f"reference.fasta sha256 mismatch for {scheme_subpath}. Attempting to normalize and recheck."
+            f"reference.fasta sha256 mismatch for {scheme_subpath}. Attempting to normalise and recheck."
         )
         reformatted_sha = None
         try:
@@ -214,7 +214,7 @@ def validate_hashes(
                 tmp_path.unlink(missing_ok=True)
         except Exception as exc:
             logger.warning(
-                f"Failed to normalize reference.fasta for {scheme_subpath}: {exc}"
+                f"Failed to normalise reference.fasta for {scheme_subpath}: {exc}"
             )
 
         if reformatted_sha == primer_scheme.reference_file_sha256:
@@ -226,7 +226,7 @@ def validate_hashes(
                 )
             else:
                 raise ValueError(
-                    f"{REFERENCE_FILE_NAME} sha256 mismatch for {scheme_subpath} (normalizable; rerun with --fix)"
+                    f"{REFERENCE_FILE_NAME} sha256 mismatch for {scheme_subpath} (normalisable; rerun with --fix)"
                 )
         else:
             raise ValueError(
@@ -259,7 +259,7 @@ def validate(
     except ValueError as exc:
         if strict and "primer.bed has changed order" in str(exc):
             logger.warning(
-                f"primer.bed order differs for {infopath}; attempting normalization if hashes mismatch."
+                f"primer.bed order differs for {infopath}; attempting normalisation if hashes mismatch."
             )
             scheme = validate_primer_bed(infopath, strict=False)
         else:
