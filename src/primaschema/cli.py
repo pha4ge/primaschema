@@ -168,10 +168,10 @@ def parse_vendor_single(v: Any) -> Vendor:
     raise ValueError(f"Cannot parse vendor: {v}")
 
 
-def _save_and_regenerate(
-    info_path: pathlib.Path, primer_scheme: PrimerScheme, regenerate_plot: bool = False
+def _save_and_rebuild_readme(
+    info_path: pathlib.Path, primer_scheme: PrimerScheme, rebuild_plot: bool = False
 ):
-    """Saves the PrimerScheme to info.json and regenerates the README."""
+    """Saves the PrimerScheme to info.json and rebuilds the README."""
     # Save info.json
     logger.debug(f"Writing info.json to {info_path}")
     with open(info_path, "w") as f:
@@ -186,7 +186,7 @@ def _save_and_regenerate(
     logger.debug(f"Regenerating README.md in {scheme_dir}")
     generate_readme(scheme_dir, primer_scheme)
 
-    if regenerate_plot:
+    if rebuild_plot:
         logger.debug(f"Ensuring plot output directory in {scheme_dir / 'work'}")
         (scheme_dir / "work").mkdir(exist_ok=True)
         logger.debug(f"Rendering primer plot to {scheme_dir / 'work' / 'primer.svg'}")
@@ -502,7 +502,7 @@ def create(
         )
 
         # Write info.json to tmp
-        _save_and_regenerate(tmp_version_level / METADATA_FILE_NAME, ps, True)
+        _save_and_rebuild_readme(tmp_version_level / METADATA_FILE_NAME, ps, True)
         # if all valid copy the tmp_version_level to output_dir
         shutil.copytree(tmp_version_level, output_dir)
         logger.debug(f"Copied tmp dir -> {output_dir}")
@@ -534,7 +534,7 @@ def add_contributor(
         logger.debug(f"Appending contributor: {contributor}")
         ps.contributors.append(contributor)
         actual_idx = len(ps.contributors) - 1
-    _save_and_regenerate(info_path, ps)
+    _save_and_rebuild_readme(info_path, ps)
     logger.info(
         f"Updated contributors for {scheme_label}: added {contributor} at idx {actual_idx}"
     )
@@ -561,7 +561,7 @@ def remove_contributor(
     removed = ps.contributors[idx]
     logger.debug(f"Removing contributor at idx={idx}: {removed}")
     ps.contributors.pop(idx)
-    _save_and_regenerate(info_path, ps)
+    _save_and_rebuild_readme(info_path, ps)
     logger.info(
         f"Updated contributors for {scheme_label}: removed {removed} at idx {idx}"
     )
@@ -592,7 +592,7 @@ def update_contributor(
     previous = ps.contributors[idx]
     logger.debug(f"Updating contributor at idx={idx}: {previous} -> {contributor}")
     ps.contributors[idx] = contributor
-    _save_and_regenerate(info_path, ps)
+    _save_and_rebuild_readme(info_path, ps)
     logger.info(
         f"Updated contributors for {scheme_label}: idx {idx} {previous} -> {contributor}"
     )
@@ -625,7 +625,7 @@ def add_vendor(
         logger.debug(f"Appending vendor: {vendor}")
         ps.vendors.append(vendor)
         actual_idx = len(ps.vendors) - 1
-    _save_and_regenerate(info_path, ps)
+    _save_and_rebuild_readme(info_path, ps)
     logger.info(
         f"Updated vendors for {scheme_label}: added {vendor} at idx {actual_idx}"
     )
@@ -653,7 +653,7 @@ def remove_vendor(
     removed = ps.vendors[idx]
     logger.debug(f"Removing vendor at idx={idx}: {removed}")
     ps.vendors.pop(idx)
-    _save_and_regenerate(info_path, ps)
+    _save_and_rebuild_readme(info_path, ps)
     logger.info(f"Updated vendors for {scheme_label}: removed {removed} at idx {idx}")
 
 
@@ -683,7 +683,7 @@ def update_vendor(
     previous = ps.vendors[idx]
     logger.debug(f"Updating vendor at idx={idx}: {previous} -> {vendor}")
     ps.vendors[idx] = vendor
-    _save_and_regenerate(info_path, ps)
+    _save_and_rebuild_readme(info_path, ps)
     logger.info(f"Updated vendors for {scheme_label}: idx {idx} {previous} -> {vendor}")
 
 
@@ -705,7 +705,7 @@ def add_tag(
     if tag not in ps.tags:
         logger.debug(f"Adding tag: {tag}")
         ps.tags.append(tag)
-        _save_and_regenerate(info_path, ps)
+        _save_and_rebuild_readme(info_path, ps)
         logger.info(f"Updated tags for {scheme_label}: added {tag}")
         return
     logger.info(f"No change for tags on {scheme_label}: {tag} already present")
@@ -726,7 +726,7 @@ def remove_tag(
     if ps.tags and tag in ps.tags:
         logger.debug(f"Removing tag: {tag}")
         ps.tags.remove(tag)
-        _save_and_regenerate(info_path, ps)
+        _save_and_rebuild_readme(info_path, ps)
         logger.info(f"Updated tags for {scheme_label}: removed {tag}")
         return
     logger.info(f"No change for tags on {scheme_label}: {tag} not present")
@@ -747,7 +747,7 @@ def update_license(
     logger.debug(f"Loaded scheme {scheme_label} from {info_path}")
     logger.debug(f"Updating license: {previous} -> {license}")
     ps.license = license
-    _save_and_regenerate(info_path, ps)
+    _save_and_rebuild_readme(info_path, ps)
     logger.info(f"Updated license for {scheme_label}: {previous} -> {license}")
 
 
@@ -766,7 +766,7 @@ def update_status(
     logger.debug(f"Loaded scheme {scheme_label} from {info_path}")
     logger.debug(f"Updating status: {previous} -> {status}")
     ps.status = status
-    _save_and_regenerate(info_path, ps)
+    _save_and_rebuild_readme(info_path, ps)
     logger.info(f"Updated status for {scheme_label}: {previous} -> {status}")
 
 
@@ -791,7 +791,7 @@ def remove_target_organism(
     removed = ps.target_organisms[idx]
     logger.debug(f"Removing target_organism at idx={idx}: {removed}")
     ps.target_organisms.pop(idx)
-    _save_and_regenerate(info_path, ps)
+    _save_and_rebuild_readme(info_path, ps)
     logger.info(
         f"Updated target_organisms for {scheme_label}: removed {removed} at idx {idx}"
     )
@@ -820,7 +820,7 @@ def add_target_organism(
 
     logger.debug(f"Adding target_organism at idx={idx}: {target_organism}")
     ps.target_organisms.insert(idx, target_organism)
-    _save_and_regenerate(info_path, ps)
+    _save_and_rebuild_readme(info_path, ps)
     logger.info(
         f"Updated target_organisms for {scheme_label}: added {target_organism} at idx {idx}"
     )
@@ -841,7 +841,7 @@ def update_algorithm(
     logger.debug(f"Loaded scheme {scheme_label} from {info_path}")
     logger.debug(f"Updating algorithm: {previous} -> {algorithm}")
     ps.algorithm = algorithm
-    _save_and_regenerate(info_path, ps)
+    _save_and_rebuild_readme(info_path, ps)
     logger.info(f"Updated algorithm for {scheme_label}: {previous} -> {algorithm}")
 
 
@@ -1004,7 +1004,7 @@ def _rebuild_one(
     ps.reference_checksum = primaschema_ref_hash(
         info_path.parent / REFERENCE_FILE_NAME, None
     )
-    _save_and_regenerate(info_path, ps)
+    _save_and_rebuild_readme(info_path, ps)
     return scheme_label
 
 

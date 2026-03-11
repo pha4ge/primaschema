@@ -121,45 +121,42 @@ class PrimerSchemeIndex(ConfiguredBaseModel):
         description="Index of primer schemes structured as {name: {amplicon_size: {version: scheme}}}",
     )
 
-    def add_index_primer_scheme(self, manifest: IndexPrimerScheme, strict=True):
+    def add_index_primer_scheme(self, index: IndexPrimerScheme, strict=True):
         # Get or create the substructure
-        name_level = self.primerschemes.setdefault(manifest.name, {})
-        amplicon_size_level = name_level.setdefault(manifest.amplicon_size, {})
+        name_level = self.primerschemes.setdefault(index.name, {})
+        amplicon_size_level = name_level.setdefault(index.amplicon_size, {})
 
         # If the version already exists, check hashes are consistent if strict
-        if manifest.version in amplicon_size_level and strict:
-            original_manifest = amplicon_size_level[manifest.version]
+        if index.version in amplicon_size_level and strict:
+            original = amplicon_size_level[index.version]
 
-            if original_manifest.primer_file_sha256 != manifest.primer_file_sha256:
+            if original.primer_file_sha256 != index.primer_file_sha256:
                 ValueError(
-                    f"primer_file_sha256 has changed for {manifest.relative_path}. Original ({original_manifest.primer_file_sha256}) -> New ({manifest.primer_file_sha256}). Use Strict == False to allow."
+                    f"primer_file_sha256 has changed for {index.relative_path}. Original ({original.primer_file_sha256}) -> New ({index.primer_file_sha256}). Use Strict == False to allow."
                 )
-            if (
-                original_manifest.reference_file_sha256
-                != manifest.reference_file_sha256
-            ):
+            if original.reference_file_sha256 != index.reference_file_sha256:
                 ValueError(
-                    f"primer_file_sha256 has changed for {manifest.relative_path}. Original ({original_manifest.reference_file_sha256}) -> New ({manifest.reference_file_sha256}). Use Strict == False to allow."
+                    f"primer_file_sha256 has changed for {index.relative_path}. Original ({original.reference_file_sha256}) -> New ({index.reference_file_sha256}). Use Strict == False to allow."
                 )
 
-            # If files hashes match update manifest.
-            amplicon_size_level[manifest.version] = manifest
+            # If file hashes match update entry.
+            amplicon_size_level[index.version] = index
         else:
             # new scheme
-            amplicon_size_level[manifest.version] = manifest
+            amplicon_size_level[index.version] = index
 
-    def remove_index_primer_scheme(self, manifest: IndexPrimerScheme) -> bool:
+    def remove_index_primer_scheme(self, index: IndexPrimerScheme) -> bool:
         # Early return if not present
-        name_level = self.primerschemes.get(manifest.name)
+        name_level = self.primerschemes.get(index.name)
         if name_level is None:
             return False
 
-        amplicon_size_level = name_level.get(manifest.amplicon_size)
+        amplicon_size_level = name_level.get(index.amplicon_size)
         if amplicon_size_level is None:
             return False
 
-        if manifest.version in amplicon_size_level:
-            amplicon_size_level.pop(manifest.version)
+        if index.version in amplicon_size_level:
+            amplicon_size_level.pop(index.version)
             # Prune the tree
             self.prune_index()  # if this is common could do a targeted prune
             return True
@@ -202,6 +199,6 @@ def update_index(
     base_url: str = "",
 ):
     for ps in primer_schemes:
-        # Convert to manifest
+        # Convert to index entry
         mps = IndexPrimerScheme.from_primer_scheme(ps, base_url=base_url)
         index.add_index_primer_scheme(mps, strict)
