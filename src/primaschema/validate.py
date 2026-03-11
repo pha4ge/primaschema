@@ -1,7 +1,10 @@
 import enum
+import logging
+import tempfile
 from pathlib import Path
 
 import linkml.validator
+from primalbedtools.bedfiles import BedLineParser, sort_bedlines
 from primalbedtools.scheme import Scheme
 from primalbedtools.validate import validate_ref_and_bed
 from pydantic_core import from_json
@@ -11,10 +14,11 @@ from primaschema import (
     PRIMER_FILE_NAME,
     REFERENCE_FILE_NAME,
     SCHEMA_DIR,
-    logger,
 )
 from primaschema.schema.info import PrimerScheme
-from primaschema.util import sha256_checksum
+from primaschema.util import read_fasta_records, sha256_checksum, write_fasta_records
+
+logger = logging.getLogger(__name__)
 
 
 class ValidationEngine(enum.Enum):
@@ -25,6 +29,7 @@ class ValidationEngine(enum.Enum):
 def validate_scheme_json_with_pydantic(info_path: Path) -> PrimerScheme:
     # Use the derived pydantic model
     primer_scheme = PrimerScheme.model_validate_json(info_path.read_text())
+    logger.info(f"Validated {info_path} with pydantic")
 
     # TODO Handle the rules not encoded in base model.
 
@@ -136,7 +141,11 @@ def validate_readme(infopath: Path, primer_scheme: PrimerScheme | None = None):
         )
 
 
-def validate_hashes(infopath: Path, primer_scheme: PrimerScheme | None = None):
+def validate_hashes(
+    infopath: Path,
+    primer_scheme: PrimerScheme | None = None,
+    edit_inplace: bool = False,
+):
     # Use provided PrimerScheme (prevent duplication) or read in for validation
     if primer_scheme is None:
         primer_scheme = PrimerScheme.model_validate_json(infopath.read_text())
@@ -151,17 +160,70 @@ def validate_hashes(infopath: Path, primer_scheme: PrimerScheme | None = None):
     primer_path = infopath.parent / PRIMER_FILE_NAME
     primer_sha = sha256_checksum(primer_path)
     if primer_sha != primer_scheme.primer_file_sha256:
-        raise ValueError(
-            f"File sha256 ({primer_sha} != info sha256 ({primer_scheme.primer_file_sha256}): {scheme_subpath}"
+        logger.warning(
+            f"primer.bed sha256 mismatch for {scheme_subpath}. Attempting to normalize and recheck."
         )
+        reformatted_sha = None
+        try:
+            header, bedlines = BedLineParser.from_file(primer_path)
+            bedlines = sort_bedlines(bedlines)
+            with tempfile.NamedTemporaryFile("w", delete=False) as tmp:
+                tmp_path = Path(tmp.name)
+            try:
+                BedLineParser.to_file(tmp_path, header, bedlines)
+                reformatted_sha = sha256_checksum(tmp_path)
+            finally:
+                tmp_path.unlink(missing_ok=True)
+        except Exception as exc:
+            logger.warning(
+                f"Failed to normalize primer.bed for {scheme_subpath}: {exc}"
+            )
+
+        if reformatted_sha == primer_scheme.primer_file_sha256:
+            if edit_inplace:
+                BedLineParser.to_file(primer_path, header, bedlines)
+            primer_sha = reformatted_sha
+            logger.warning(
+                f"primer.bed reformatted to match expected sha256 for {scheme_subpath}."
+            )
+        else:
+            raise ValueError(
+                f"{PRIMER_FILE_NAME} sha256 ({primer_sha} != info sha256 ({primer_scheme.primer_file_sha256}): {scheme_subpath}"
+            )
 
     # Check sha256 hash ref
     reference_path = infopath.parent / REFERENCE_FILE_NAME
     reference_sha = sha256_checksum(reference_path)
     if reference_sha != primer_scheme.reference_file_sha256:
-        raise ValueError(
-            f"File sha256 ({reference_sha} != info sha256 ({primer_scheme.reference_file_sha256}): {scheme_subpath}"
+        logger.warning(
+            f"reference.fasta sha256 mismatch for {scheme_subpath}. Attempting to normalize and recheck."
         )
+        reformatted_sha = None
+        try:
+            reference_records = read_fasta_records(reference_path)
+            with tempfile.NamedTemporaryFile("w", delete=False) as tmp:
+                tmp_path = Path(tmp.name)
+            try:
+                write_fasta_records(tmp_path, reference_records)
+                reformatted_sha = sha256_checksum(tmp_path)
+            finally:
+                tmp_path.unlink(missing_ok=True)
+        except Exception as exc:
+            logger.warning(
+                f"Failed to normalize reference.fasta for {scheme_subpath}: {exc}"
+            )
+
+        if reformatted_sha == primer_scheme.reference_file_sha256:
+            if edit_inplace:
+                write_fasta_records(reference_path, reference_records)
+            reference_sha = reformatted_sha
+            logger.warning(
+                f"reference.fasta reformatted to match expected sha256 for {scheme_subpath}."
+            )
+        else:
+            raise ValueError(
+                f"{REFERENCE_FILE_NAME} sha256 ({reference_sha} != info sha256 ({primer_scheme.reference_file_sha256}): {scheme_subpath}"
+            )
 
     # TODO Check primaschema hashes.
 
@@ -171,6 +233,7 @@ def validate(
     primer_scheme: PrimerScheme | None = None,
     additional_linkml: bool = False,
     strict: bool = False,
+    edit_inplace: bool = False,
 ):
     logger.debug(f"Validating {'strict' if strict else ''} {infopath}")
     if additional_linkml:
@@ -183,12 +246,21 @@ def validate(
     logger.debug(f"Validated with Pydantic: {infopath}")
 
     # Validate primer + ref
-    scheme = validate_primer_bed(infopath, strict)
+    try:
+        scheme = validate_primer_bed(infopath, strict)
+    except ValueError as exc:
+        if strict and "primer.bed has changed order" in str(exc):
+            logger.warning(
+                f"primer.bed order differs for {infopath}; attempting normalization if hashes mismatch."
+            )
+            scheme = validate_primer_bed(infopath, strict=False)
+        else:
+            raise
     validate_ref_and_bed(scheme.bedlines, str(infopath.parent / REFERENCE_FILE_NAME))
     logger.debug(f"Validated primer.bed files:  {infopath}")
 
     # Validate hashes
-    validate_hashes(infopath, primer_scheme)
+    validate_hashes(infopath, primer_scheme, edit_inplace=edit_inplace)
     validate_readme(infopath, primer_scheme)
     logger.debug(f"Validated hashes and README:  {infopath}")
 
@@ -200,5 +272,14 @@ def validate_all(
     Recursively searches through the primer_schemes_path for {METADATA_FILE_NAME}
     """
 
+    errors: list[str] = []
     for schemeinfo in primer_schemes_path.rglob(f"*/{METADATA_FILE_NAME}"):
-        validate(schemeinfo, None, additional_linkml, strict)
+        try:
+            validate(schemeinfo, None, additional_linkml, strict)
+        except Exception as exc:
+            logger.error(f"Validation failed for {schemeinfo}: {exc}")
+            errors.append(f"{schemeinfo}: {exc}")
+    if errors:
+        raise ValueError(
+            f"Validation failed for {len(errors)} scheme(s):\n" + "\n".join(errors)
+        )

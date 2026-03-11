@@ -1,5 +1,6 @@
 import hashlib
 import json
+import logging
 import re
 import sys
 from collections import defaultdict
@@ -10,15 +11,16 @@ import altair as alt
 import linkml.validator
 import pandas as pd
 import yaml
-from Bio import SeqIO
 from linkml.generators.pydanticgen import PydanticGenerator
 
 from primaschema import (
     MANIFEST_HEADER_PATH,
     SCHEMA_DIR,
-    logger,
 )
 from primaschema.schema import bed, info
+from primaschema.util import read_fasta_records, reverse_complement, write_fasta_records
+
+logger = logging.getLogger(__name__)
 
 SCHEME_BED_FIELDS = ["chrom", "chromStart", "chromEnd", "name", "poolName", "strand"]
 PRIMER_BED_FIELDS = SCHEME_BED_FIELDS + ["sequence"]
@@ -122,15 +124,18 @@ def hash_scheme_bed(bed_path: Path, fasta_path: Path) -> str:
     Hash a 6 column scheme.bed file by first converting to 7 column primer.bed
     """
     logger.info("Hashing scheme.bed using reference backfill")
-    ref_record = SeqIO.read(fasta_path, "fasta")
+    ref_records = read_fasta_records(fasta_path)
+    if len(ref_records) != 1:
+        raise ValueError(f"Expected single FASTA record in {fasta_path}")
+    ref_record = ref_records[0]
     df = parse_scheme_bed(bed_path)
     records = df.to_dict("records")
     for r in records:
         start_pos, end_pos = r["chromStart"], r["chromEnd"]
         if r["strand"] == "+":
-            r["sequence"] = str(ref_record.seq[start_pos:end_pos])
+            r["sequence"] = str(ref_record.sequence[start_pos:end_pos])
         elif r["strand"] == "-":
-            r["sequence"] = str(ref_record.seq[start_pos:end_pos].reverse_complement())
+            r["sequence"] = reverse_complement(ref_record.sequence[start_pos:end_pos])
         else:
             raise RuntimeError(f"Invalid strand for BED record {r}")
     bed7_df = pd.DataFrame(records)
@@ -143,18 +148,16 @@ def convert_primer_bed_to_scheme_bed(bed_path: Path) -> str:
 
 
 def convert_scheme_bed_to_primer_bed(bed_path: Path, fasta_path: Path) -> str:
-    ids_seqs = SeqIO.to_dict(SeqIO.parse(fasta_path, "fasta"))
+    ids_seqs = {record.id: record.sequence for record in read_fasta_records(fasta_path)}
     df = parse_scheme_bed(bed_path)
     records = df.to_dict("records")
     for r in records:
         chrom = r["chrom"].partition(" ")[0]  # Use chrom name before first space
         start_pos, end_pos = r["chromStart"], r["chromEnd"]
         if r["strand"] == "+":
-            r["sequence"] = str(ids_seqs[chrom].seq[start_pos:end_pos])
+            r["sequence"] = str(ids_seqs[chrom][start_pos:end_pos])
         else:
-            r["sequence"] = str(
-                ids_seqs[chrom].seq[start_pos:end_pos].reverse_complement()
-            )
+            r["sequence"] = reverse_complement(ids_seqs[chrom][start_pos:end_pos])
     df = pd.DataFrame(records)
     return df.to_csv(sep="\t", header=False, index=False)
 
@@ -172,8 +175,8 @@ def hash_bed(bed_path: Path) -> str:
 
 def hash_ref(ref_path: Path):
     chroms_seqs = {}
-    for record in SeqIO.parse(ref_path, "fasta"):
-        chroms_seqs[record.id] = str(record.seq).upper()
+    for record in read_fasta_records(ref_path):
+        chroms_seqs[record.id] = str(record.sequence).upper()
     chroms_seqs_sorted = {key: chroms_seqs[key] for key in sorted(chroms_seqs)}
     string = ""
     for chrom, seq in chroms_seqs_sorted.items():
@@ -239,8 +242,8 @@ def validate_bed_and_ref(
 
     # If a ref_path is supplied, populate the reference_lengths field of BedModel
     if ref_path:
-        records = SeqIO.parse(ref_path, "fasta")
-        reference_lengths = {r.id.partition(" ")[0]: len(r.seq) for r in records}
+        records = read_fasta_records(ref_path)
+        reference_lengths = {r.id: len(r.sequence) for r in records}
     else:
         reference_lengths = None
     return bed.BedModel(amplicons=amplicons, reference_lengths=reference_lengths)
@@ -491,15 +494,14 @@ def subset(scheme_dir: Path, chrom: str, out_dir: Path = Path("built")) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     reference_chroms = set()
     subset_record = None
-    for record in SeqIO.parse(scheme_dir / "reference.fasta", "fasta"):
+    for record in read_fasta_records(scheme_dir / "reference.fasta"):
         reference_chroms.add(record.id)
         if record.id == chrom:
             subset_record = record
     if not subset_record:
         raise ValueError(f"Chrom {chrom} not found in reference.fasta")
     else:
-        with open(out_dir / "reference.fasta", "w") as fh:
-            SeqIO.write(subset_record, fh, "fasta")
+        write_fasta_records(out_dir / "reference.fasta", [subset_record])
 
     primers_df = parse_primer_bed(scheme_dir / "primer.bed")
     primers_df["chrom"] = primers_df["chrom"].str.partition(" ")[0]

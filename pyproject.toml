@@ -4,12 +4,13 @@ build-backend = "flit_core.buildapi"
 
 [project]
 name = "primaschema"
+version = "0.1.0"
+description = "Metadata tooling for pha4ge primerschemes"
 authors = [
     {name = "Bede Constantinides", email="bedeabc@gmail.com"},
     {name = "Chris Kent", email="chrisgkent@protonmail.com"},
     {name = "Peter van Heusden", email="pvh@sanbi.ac.za"},
 ]
-dynamic = ["version", "description"]
 readme = "README.md"
 requires-python = ">=3.12"
 keywords = ["genomics"]
@@ -25,8 +26,8 @@ classifiers = [
 ]
 dependencies = [
     "altair>=5.3.0",
-    "biopython>=1.80",
     "cyclopts>=4.3.0",
+    "dnaio>=1.2.4",
     "jsonschema",
     "linkml>=1.9.4",
     "natsort>=8.4.0",
@@ -38,8 +39,8 @@ dependencies = [
 ]
 
 [project.scripts]
-primaschema = "primaschema.create:app"
-new = "primaschema.create:app"
+primaschema = "primaschema.create:main"
+new = "primaschema.create:main"
 
 [project.urls]
 Home = "https://github.com/pha4ge/primaschema"

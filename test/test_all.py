@@ -1,11 +1,14 @@
+import shutil
 import subprocess
-
 from pathlib import Path
 
 import pytest
 
+import primaschema.create as create_module
 import primaschema.lib as lib
-
+import primaschema.validate as validate_module
+from primaschema.schema.info import PrimerScheme
+from primaschema.util import sha256_checksum
 
 data_dir = Path("test/data")
 
@@ -40,9 +43,13 @@ def test_hash_bed():
     )
 
 
-def test_build_manifest():
-    lib.build_manifest(root_dir=data_dir / "primer-schemes")
-    run("rm -rf built index.json", cwd="./")
+def test_build_manifest(tmp_path: Path):
+    src = data_dir / "primer-schemes"
+    dest = tmp_path / "primer-schemes"
+    shutil.copytree(src, dest)
+    lib.build_manifest(root_dir=dest, out_dir=tmp_path)
+    manifest_path = tmp_path / "index.json"
+    assert manifest_path.exists()
 
 
 def test_primer_bed_to_scheme_bed():
@@ -141,6 +148,86 @@ MN908947.3	705	727	SARS-CoV-2_2_RIGHT_1	2	-	ATAAGGATCAGTGCCAAGCTCG"""
     )
 
 
+def _copy_scheme(tmp_path: Path, rel_path: str) -> Path:
+    src = data_dir / rel_path
+    dest = tmp_path / rel_path
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(src, dest)
+    return dest
+
+
+def _copy_scheme_to(src_rel_path: str, dest: Path) -> Path:
+    src = data_dir / src_rel_path
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(src, dest)
+    return dest
+
+
+def test_validate_autonormalize_primer_bed(tmp_path: Path):
+    scheme_dir = _copy_scheme(
+        tmp_path,
+        "auto-normalisation/test/400/v2.0.0",
+    )
+    info_path = scheme_dir / "info.json"
+    primer_path = scheme_dir / "primer.bed"
+    primer_scheme = PrimerScheme.model_validate_json(info_path.read_text())
+
+    assert sha256_checksum(primer_path) != primer_scheme.primer_file_sha256
+
+    validate_module.validate(info_path, strict=True, edit_inplace=True)
+
+    assert sha256_checksum(primer_path) == primer_scheme.primer_file_sha256
+
+
+def test_validate_autonormalize_reference_fasta(tmp_path: Path):
+    scheme_dir = _copy_scheme(
+        tmp_path,
+        "auto-normalisation/test/400/v2.0.0",
+    )
+    info_path = scheme_dir / "info.json"
+    reference_path = scheme_dir / "reference.fasta"
+    primer_scheme = PrimerScheme.model_validate_json(info_path.read_text())
+
+    assert sha256_checksum(reference_path) != primer_scheme.reference_file_sha256
+
+    validate_module.validate(info_path, strict=True, edit_inplace=True)
+
+    assert sha256_checksum(reference_path) == primer_scheme.reference_file_sha256
+
+
+def test_validate_all_aggregates_errors_create_cli(tmp_path: Path):
+    bad1 = tmp_path / "bad1" / "999" / "v0.0.1"
+    bad2 = tmp_path / "bad2" / "999" / "v0.0.2"
+    _copy_scheme_to("auto-normalisation/test/400/v2.0.0", bad1)
+    _copy_scheme_to("auto-normalisation/test/400/v2.0.0", bad2)
+
+    with pytest.raises(ValueError) as exc:
+        create_module.validate(
+            path=tmp_path,
+            all=True,
+            additional_linkml=False,
+            strict=True,
+        )
+
+    msg = str(exc.value)
+    assert "bad1" in msg
+    assert "bad2" in msg
+
+
+def test_validate_all_aggregates_errors_module(tmp_path: Path):
+    bad1 = tmp_path / "bad1" / "999" / "v0.0.1"
+    bad2 = tmp_path / "bad2" / "999" / "v0.0.2"
+    _copy_scheme_to("auto-normalisation/test/400/v2.0.0", bad1)
+    _copy_scheme_to("auto-normalisation/test/400/v2.0.0", bad2)
+
+    with pytest.raises(ValueError) as exc:
+        validate_module.validate_all(tmp_path, additional_linkml=False, strict=True)
+
+    msg = str(exc.value)
+    assert "bad1" in msg
+    assert "bad2" in msg
+
+
 def test_invalid_missing_field():
     with pytest.raises(ValueError):  # Also catches pydantic.ValidationError
         lib.validate(data_dir / "broken/info-yml/missing-field")
@@ -166,7 +253,7 @@ def test_subset():
 
 def test_dev_scheme():
     lib.validate(data_dir / "dev-scheme")
-    lib.validate(data_dir / "dev-scheme", full=True, rebuild=True)
+    lib.validate(data_dir / "dev-scheme", full=True)
 
 
 def test_cli_create():
@@ -188,3 +275,24 @@ def test_cli_create():
     assert Path("built/artic/400/v4.1.0/reference.fasta").exists()
     assert Path("built/artic/400/v4.1.0/info.json").exists()
     run("rm -rf built/artic", cwd="./")
+
+
+def test_regenerate_syncs_metadata_from_path(tmp_path: Path):
+    src = data_dir / "auto-normalisation/test/400/v2.0.0"
+    dest = tmp_path / "artic-sars-cov-2" / "1200" / "v9.9.9"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(src, dest)
+    info_path = dest / "info.json"
+    primer_scheme = PrimerScheme.model_validate_json(info_path.read_text())
+    assert primer_scheme.name != "artic-sars-cov-2"
+    assert primer_scheme.amplicon_size != 1200
+    assert primer_scheme.version != "v9.9.9"
+
+    from primaschema.create import _regenerate_one
+
+    _regenerate_one(info_path, sync_metadata=True)
+
+    updated_scheme = PrimerScheme.model_validate_json(info_path.read_text())
+    assert updated_scheme.name == "artic-sars-cov-2"
+    assert updated_scheme.amplicon_size == 1200
+    assert updated_scheme.version == "v9.9.9"
