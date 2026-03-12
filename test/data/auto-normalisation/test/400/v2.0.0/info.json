@@ -24,8 +24,8 @@
     "name": "PrimalScheme",
     "version": "3.01"
   },
-  "primer_checksum": "primaschema:bed:b2e359aafd5747a0",
-  "primer_file_sha256": "sha256:f3154104f2ac9d94bc33d59067e1b00e0765a11c19dee9546b6596ae18b805f3",
-  "reference_checksum": "primaschema:ref:21c16fc69acb3b9e",
-  "reference_file_sha256": "sha256:9e08a5c6ccabc87074b46989335c3bacdb9662cd5aa3058451255ded8e436226"
+  "checksums": {
+    "primer_sha256": "f3154104f2ac9d94bc33d59067e1b00e0765a11c19dee9546b6596ae18b805f3",
+    "reference_sha256": "9e08a5c6ccabc87074b46989335c3bacdb9662cd5aa3058451255ded8e436226"
+  }
 }

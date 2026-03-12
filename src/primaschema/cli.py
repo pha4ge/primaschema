@@ -22,6 +22,7 @@ from primaschema import (
 from primaschema.lib import get_scheme, plot_primers
 from primaschema.schema.info import (
     Algorithm,
+    Checksums,
     Contributor,
     PrimerScheme,
     SchemeLicense,
@@ -40,8 +41,6 @@ from primaschema.schema.index import (
 from primaschema.setup_logging import LogLevel, configure_logging
 from primaschema.util import (
     find_all_info_json,
-    primaschema_bed_hash,
-    primaschema_ref_hash,
     read_fasta_records,
     sha256_checksum,
     write_fasta_records,
@@ -374,10 +373,7 @@ class CLIPrimerScheme(PrimerScheme):
     ] = None
     algorithm: Annotated[Optional[Algorithm], Parameter(parse=False)] = None
     # Don't expose the checksums to cli
-    primer_checksum: Annotated[str | None, Parameter(parse=False)] = None
-    primer_file_sha256: Annotated[str | None, Parameter(parse=False)] = None
-    reference_checksum: Annotated[str | None, Parameter(parse=False)] = None
-    reference_file_sha256: Annotated[str | None, Parameter(parse=False)] = None
+    checksums: Annotated[Checksums | None, Parameter(parse=False)] = None
 
     @field_validator("target_organisms")
     def validate_target_organisms(cls, v):
@@ -484,22 +480,14 @@ def create(
             f"Generated validated {PRIMER_FILE_NAME} and {REFERENCE_FILE_NAME}"
         )
 
-        # Generate hashes of the files
-        ps.primer_file_sha256 = sha256_checksum(tmp_version_level / PRIMER_FILE_NAME)
-        ps.reference_file_sha256 = sha256_checksum(
-            tmp_version_level / REFERENCE_FILE_NAME
+        # Generate checksums
+        ps.checksums = Checksums(
+            primer_sha256=sha256_checksum(tmp_version_level / PRIMER_FILE_NAME),
+            reference_sha256=sha256_checksum(tmp_version_level / REFERENCE_FILE_NAME),
         )
         logger.debug(
-            f"Generated sha256 hashes for {PRIMER_FILE_NAME} ({ps.primer_file_sha256})"
-            f" and {REFERENCE_FILE_NAME} ({ps.reference_file_sha256})"
-        )
-
-        # add primaschema hashes
-        ps.primer_checksum = primaschema_bed_hash(None, bedlines)
-        ps.reference_checksum = primaschema_ref_hash(None, reference_records)
-        logger.debug(
-            f"Generated primaschema hashes for {PRIMER_FILE_NAME} ({ps.primer_checksum})"
-            f" and {REFERENCE_FILE_NAME} ({ps.reference_checksum})"
+            f"Generated checksums for {PRIMER_FILE_NAME} ({ps.checksums.primer_sha256})"
+            f" and {REFERENCE_FILE_NAME} ({ps.checksums.reference_sha256})"
         )
 
         # Write info.json to tmp
@@ -998,12 +986,10 @@ def _rebuild_one(
         logger.debug(f"Wrote sorted bedlines to {info_path.parent / PRIMER_FILE_NAME}")
     logger.debug("Validating primer.bed against reference.fasta")
     validate_ref_and_bed(bls, str((info_path.parent / REFERENCE_FILE_NAME).absolute()))
-    logger.debug("Computing sha256 and primaschema hashes")
-    ps.primer_file_sha256 = sha256_checksum(info_path.parent / PRIMER_FILE_NAME)
-    ps.reference_file_sha256 = sha256_checksum(info_path.parent / REFERENCE_FILE_NAME)
-    ps.primer_checksum = primaschema_bed_hash(None, bls)
-    ps.reference_checksum = primaschema_ref_hash(
-        info_path.parent / REFERENCE_FILE_NAME, None
+    logger.debug("Computing sha256 checksums")
+    ps.checksums = Checksums(
+        primer_sha256=sha256_checksum(info_path.parent / PRIMER_FILE_NAME),
+        reference_sha256=sha256_checksum(info_path.parent / REFERENCE_FILE_NAME),
     )
     _save_and_rebuild_readme(info_path, ps)
     return scheme_label

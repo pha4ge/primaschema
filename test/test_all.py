@@ -19,30 +19,6 @@ def run(cmd, cwd=data_dir):  # Helper for CLI testing
     )
 
 
-def test_hash_ref():
-    assert (
-        lib.hash_ref(
-            "test/data/primer-schemes/schemes/sars-cov-2/eden/2500/v1.0.0/reference.fasta"
-        )
-        == "primaschema:b1acd7163146bf17"
-    )
-
-
-def test_checksum_case_normalisation():
-    assert lib.hash_bed(
-        data_dir / "primer-schemes/schemes/sars-cov-2/eden/2500/v1.0.0/primer.bed"
-    ) == lib.hash_bed(data_dir / "different-case/eden.modified.primer.bed")
-
-
-def test_hash_bed():
-    lib.hash_bed(
-        data_dir / "primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0/primer.bed"
-    )
-    lib.hash_bed(
-        data_dir / "primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0/scheme.bed"
-    )
-
-
 def test_build_index(tmp_path: Path):
     src = data_dir / "primer-schemes"
     dest = tmp_path / "primer-schemes"
@@ -172,11 +148,11 @@ def test_validate_autonormalize_primer_bed(tmp_path: Path):
     primer_path = scheme_dir / "primer.bed"
     primer_scheme = PrimerScheme.model_validate_json(info_path.read_text())
 
-    assert sha256_checksum(primer_path) != primer_scheme.primer_file_sha256
+    assert sha256_checksum(primer_path) != primer_scheme.checksums.primer_sha256
 
     validate_module.validate(info_path, strict=True, fix=True)
 
-    assert sha256_checksum(primer_path) == primer_scheme.primer_file_sha256
+    assert sha256_checksum(primer_path) == primer_scheme.checksums.primer_sha256
 
 
 def test_validate_autonormalize_reference_fasta(tmp_path: Path):
@@ -188,11 +164,11 @@ def test_validate_autonormalize_reference_fasta(tmp_path: Path):
     reference_path = scheme_dir / "reference.fasta"
     primer_scheme = PrimerScheme.model_validate_json(info_path.read_text())
 
-    assert sha256_checksum(reference_path) != primer_scheme.reference_file_sha256
+    assert sha256_checksum(reference_path) != primer_scheme.checksums.reference_sha256
 
     validate_module.validate(info_path, strict=True, fix=True)
 
-    assert sha256_checksum(reference_path) == primer_scheme.reference_file_sha256
+    assert sha256_checksum(reference_path) == primer_scheme.checksums.reference_sha256
 
 
 def test_validate_all_aggregates_errors_create_cli(tmp_path: Path):

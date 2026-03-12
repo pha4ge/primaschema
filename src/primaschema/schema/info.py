@@ -130,10 +130,7 @@ class PrimerScheme(ConfiguredBaseModel):
     notes: Optional[list[str]] = Field(default=[], description="""Notes about the amplicon primer scheme""")
     vendors: Optional[list[Vendor]] = Field(default=[], description="""Vendors where one can purchase the primers described in the amplicon scheme or a kit containing these primers""")
     algorithm: Optional[Algorithm] = Field(default=None, description="""The algorithm (if any) used to generate this primer scheme""")
-    primer_checksum: Optional[str] = Field(default=None, description="""Checksum for the primer scheme BED file, in format checksum_type:checksum, where checksum_type is lowercase name of checksum generator e.g. primaschema""")
-    primer_file_sha256: Optional[str] = Field(default=None, description="""SHA256 checksum for the primer scheme BED file""")
-    reference_checksum: Optional[str] = Field(default=None, description="""Checksum for the reference FASTA file, in format checksum_type:checksum, where checksum_type is lowercase name of checksum generator e.g. primaschema""")
-    reference_file_sha256: Optional[str] = Field(default=None, description="""SHA256 checksum for the reference FASTA file""")
+    checksums: Optional[Checksums] = Field(default=None, description="""SHA256 checksums for scheme files""")
     ref_selections: Optional[list[RefSelection]] = Field(default=[], description="""Optional reference selections""")
 
     @field_validator('name')
@@ -159,32 +156,6 @@ class PrimerScheme(ConfiguredBaseModel):
                     raise ValueError(err_msg)
         elif isinstance(v, str) and not pattern.match(v):
             err_msg = f"Invalid version format: {v}"
-            raise ValueError(err_msg)
-        return v
-
-    @field_validator('primer_file_sha256')
-    def pattern_primer_file_sha256(cls, v):
-        pattern=re.compile(r"^sha256:[a-fA-F0-9]{64}$")
-        if isinstance(v, list):
-            for element in v:
-                if isinstance(element, str) and not pattern.match(element):
-                    err_msg = f"Invalid primer_file_sha256 format: {element}"
-                    raise ValueError(err_msg)
-        elif isinstance(v, str) and not pattern.match(v):
-            err_msg = f"Invalid primer_file_sha256 format: {v}"
-            raise ValueError(err_msg)
-        return v
-
-    @field_validator('reference_file_sha256')
-    def pattern_reference_file_sha256(cls, v):
-        pattern=re.compile(r"^sha256:[a-fA-F0-9]{64}$")
-        if isinstance(v, list):
-            for element in v:
-                if isinstance(element, str) and not pattern.match(element):
-                    err_msg = f"Invalid reference_file_sha256 format: {element}"
-                    raise ValueError(err_msg)
-        elif isinstance(v, str) and not pattern.match(v):
-            err_msg = f"Invalid reference_file_sha256 format: {v}"
             raise ValueError(err_msg)
         return v
 
@@ -228,6 +199,40 @@ class Algorithm(ConfiguredBaseModel):
     version: Optional[str] = Field(default=None, description="""The version of the Algorithm""")
 
 
+class Checksums(ConfiguredBaseModel):
+    """
+    SHA256 checksums for scheme files
+    """
+    primer_sha256: Optional[str] = Field(default=None, description="""SHA256 checksum for the primer scheme BED file""")
+    reference_sha256: Optional[str] = Field(default=None, description="""SHA256 checksum for the reference FASTA file""")
+
+    @field_validator('primer_sha256')
+    def pattern_primer_sha256(cls, v):
+        pattern=re.compile(r"^[a-fA-F0-9]{64}$")
+        if isinstance(v, list):
+            for element in v:
+                if isinstance(element, str) and not pattern.match(element):
+                    err_msg = f"Invalid primer_sha256 format: {element}"
+                    raise ValueError(err_msg)
+        elif isinstance(v, str) and not pattern.match(v):
+            err_msg = f"Invalid primer_sha256 format: {v}"
+            raise ValueError(err_msg)
+        return v
+
+    @field_validator('reference_sha256')
+    def pattern_reference_sha256(cls, v):
+        pattern=re.compile(r"^[a-fA-F0-9]{64}$")
+        if isinstance(v, list):
+            for element in v:
+                if isinstance(element, str) and not pattern.match(element):
+                    err_msg = f"Invalid reference_sha256 format: {element}"
+                    raise ValueError(err_msg)
+        elif isinstance(v, str) and not pattern.match(v):
+            err_msg = f"Invalid reference_sha256 format: {v}"
+            raise ValueError(err_msg)
+        return v
+
+
 class RefSelection(ConfiguredBaseModel):
     file_sha256: Optional[str] = Field(default=None, description="""SHA256 checksum for the reference selection file""")
     file_name: Optional[str] = Field(default=None, description="""File name of the reference selection file""")
@@ -235,7 +240,7 @@ class RefSelection(ConfiguredBaseModel):
 
     @field_validator('file_sha256')
     def pattern_file_sha256(cls, v):
-        pattern=re.compile(r"^sha256:[a-fA-F0-9]{64}$")
+        pattern=re.compile(r"^[a-fA-F0-9]{64}$")
         if isinstance(v, list):
             for element in v:
                 if isinstance(element, str) and not pattern.match(element):
@@ -261,5 +266,6 @@ PrimerScheme.model_rebuild()
 Vendor.model_rebuild()
 Contributor.model_rebuild()
 Algorithm.model_rebuild()
+Checksums.model_rebuild()
 RefSelection.model_rebuild()
 TargetOrganism.model_rebuild()

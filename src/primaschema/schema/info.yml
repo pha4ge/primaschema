@@ -45,10 +45,7 @@ classes:
       - notes
       - vendors
       - algorithm
-      - primer_checksum
-      - primer_file_sha256
-      - reference_checksum
-      - reference_file_sha256
+      - checksums
       - ref_selections
 
   Vendor:
@@ -91,11 +88,21 @@ classes:
         slot_uri: IAO:0000129
         description: "The version of the Algorithm"
 
+  Checksums:
+    description: "SHA256 checksums for scheme files"
+    attributes:
+      primer_sha256:
+        description: "SHA256 checksum for the primer scheme BED file"
+        pattern: "^[a-fA-F0-9]{64}$"
+      reference_sha256:
+        description: "SHA256 checksum for the reference FASTA file"
+        pattern: "^[a-fA-F0-9]{64}$"
+
   RefSelection:
     attributes:
       file_sha256:
         description: SHA256 checksum for the reference selection file
-        pattern: "^sha256:[a-fA-F0-9]{64}$"
+        pattern: "^[a-fA-F0-9]{64}$"
       file_name:
         description: File name of the reference selection file
       chromosome:
@@ -176,17 +183,10 @@ slots:
     description: "URLs of publications describing the scheme (DOIs preferred when available)"
     multivalued: true
     inlined_as_list: true
-  primer_checksum:
-    slot_uri: GENEPIO:0100675
-    description: "Checksum for the primer scheme BED file, in format checksum_type:checksum, where checksum_type is lowercase name of checksum generator e.g. primaschema"
-  primer_file_sha256:
-    description: "SHA256 checksum for the primer scheme BED file"
-    pattern: "^sha256:[a-fA-F0-9]{64}$"
-  reference_checksum:
-    description: "Checksum for the reference FASTA file, in format checksum_type:checksum, where checksum_type is lowercase name of checksum generator e.g. primaschema"
-  reference_file_sha256:
-    description: "SHA256 checksum for the reference FASTA file"
-    pattern: "^sha256:[a-fA-F0-9]{64}$"
+  checksums:
+    description: "SHA256 checksums for scheme files"
+    range: Checksums
+    inlined: true
   derived_from:
     slot_uri: GENEPIO:0100671
     description: "Canonical name of the primer scheme from which this scheme was derived"

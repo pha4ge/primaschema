@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field, computed_field
 
 from primaschema import METADATA_FILE_NAME, PRIMER_FILE_NAME, REFERENCE_FILE_NAME
 from primaschema.schema.info import (
+    Checksums,
     ConfiguredBaseModel,
     Contributor,
     PrimerScheme,
@@ -57,13 +58,9 @@ class IndexPrimerScheme(BaseModel):
         default=None,
         description="""Canonical name of the primer scheme from which this scheme was derived""",
     )
-    primer_file_sha256: Optional[str] = Field(
+    checksums: Optional[Checksums] = Field(
         default=None,
-        description="""SHA256 checksum for the primer scheme BED file""",
-    )
-    reference_file_sha256: Optional[str] = Field(
-        default=None,
-        description="""SHA256 checksum for the reference FASTA file""",
+        description="""SHA256 checksums for scheme files""",
     )
     base_url: str = Field(default="", exclude=True)
 
@@ -105,8 +102,7 @@ class IndexPrimerScheme(BaseModel):
             status=scheme.status,
             tags=scheme.tags,
             derived_from=scheme.derived_from,
-            primer_file_sha256=scheme.primer_file_sha256,
-            reference_file_sha256=scheme.reference_file_sha256,
+            checksums=scheme.checksums,
             base_url=base_url,
         )
 
@@ -130,13 +126,9 @@ class PrimerSchemeIndex(ConfiguredBaseModel):
         if index.version in amplicon_size_level and strict:
             original = amplicon_size_level[index.version]
 
-            if original.primer_file_sha256 != index.primer_file_sha256:
+            if original.checksums != index.checksums:
                 ValueError(
-                    f"primer_file_sha256 has changed for {index.relative_path}. Original ({original.primer_file_sha256}) -> New ({index.primer_file_sha256}). Use Strict == False to allow."
-                )
-            if original.reference_file_sha256 != index.reference_file_sha256:
-                ValueError(
-                    f"primer_file_sha256 has changed for {index.relative_path}. Original ({original.reference_file_sha256}) -> New ({index.reference_file_sha256}). Use Strict == False to allow."
+                    f"checksums have changed for {index.relative_path}. Use Strict == False to allow."
                 )
 
             # If file hashes match update entry.

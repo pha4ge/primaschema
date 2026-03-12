@@ -31,22 +31,8 @@ logger = logging.getLogger(__name__)
 
 SCHEME_BED_FIELDS = ["chrom", "chromStart", "chromEnd", "name", "poolName", "strand"]
 PRIMER_BED_FIELDS = SCHEME_BED_FIELDS + ["sequence"]
-HASHED_BED_FIELDS = [
-    "chrom",
-    "chromStart",
-    "chromEnd",
-    "poolName",
-    "strand",
-    "sequence",
-]
 POSITION_FIELDS = ["chromStart", "chromEnd"]
 MANDATORY_FILES = ("primer.bed", "reference.fasta", "info.yml")
-
-
-def hash_string(string: str) -> str:
-    """Normalise case, sorting, terminal spaces & return prefixed 64b of SHA256 hex"""
-    checksum = hashlib.sha256(str(string).strip().upper().encode()).hexdigest()[:16]
-    return f"primaschema:{checksum}"
 
 
 def parse_scheme_bed(bed_path: Path) -> pd.DataFrame:
@@ -100,55 +86,6 @@ def sort_primer_df(df: pd.DataFrame) -> pd.DataFrame:
     )[[*PRIMER_BED_FIELDS]]
 
 
-def normalise_primer_df(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Removes terminal whitespace and normalises case
-    Sorts by chromStart, chromEnd, poolName, strand, sequence
-    Removes duplicate records, collapsing alts with same coords if backfilled from ref
-    """
-    df["sequence"] = df["sequence"].str.strip().str.upper()
-    return sort_primer_df(df)
-
-
-def hash_primer_df(df: pd.DataFrame) -> str:
-    """
-    Returns prefixed SHA256 digest from stringified dataframe
-    """
-    normalised_df = normalise_primer_df(df)
-    string = normalised_df[[*HASHED_BED_FIELDS]].to_csv(index=False, header=False)
-    logger.debug(f"hash_primer_df() {string=}")
-    return hash_string(string)
-
-
-def hash_primer_bed(bed_path: Path):
-    """Hash a 7 column primer.bed file"""
-    df = parse_primer_bed(bed_path)
-    return hash_primer_df(df)
-
-
-def hash_scheme_bed(bed_path: Path, fasta_path: Path) -> str:
-    """
-    Hash a 6 column scheme.bed file by first converting to 7 column primer.bed
-    """
-    logger.info("Hashing scheme.bed using reference backfill")
-    ref_records = read_fasta_records(fasta_path)
-    if len(ref_records) != 1:
-        raise ValueError(f"Expected single FASTA record in {fasta_path}")
-    ref_record = ref_records[0]
-    df = parse_scheme_bed(bed_path)
-    records = df.to_dict("records")
-    for r in records:
-        start_pos, end_pos = r["chromStart"], r["chromEnd"]
-        if r["strand"] == "+":
-            r["sequence"] = str(ref_record.sequence[start_pos:end_pos])
-        elif r["strand"] == "-":
-            r["sequence"] = reverse_complement(ref_record.sequence[start_pos:end_pos])
-        else:
-            raise RuntimeError(f"Invalid strand for BED record {r}")
-    bed7_df = pd.DataFrame(records)
-    return hash_primer_df(bed7_df)
-
-
 def convert_primer_bed_to_scheme_bed(bed_path: Path) -> str:
     df = parse_primer_bed(bed_path).drop("sequence", axis=1)
     return df.to_csv(sep="\t", header=False, index=False)
@@ -167,29 +104,6 @@ def convert_scheme_bed_to_primer_bed(bed_path: Path, fasta_path: Path) -> str:
             r["sequence"] = reverse_complement(ids_seqs[chrom][start_pos:end_pos])
     df = pd.DataFrame(records)
     return df.to_csv(sep="\t", header=False, index=False)
-
-
-def hash_bed(bed_path: Path) -> str:
-    bed_type = infer_bed_type(bed_path)
-    if bed_type == "primer":
-        checksum = hash_primer_bed(bed_path)
-    else:  # bed_type == "scheme"
-        checksum = hash_scheme_bed(
-            bed_path=bed_path, fasta_path=bed_path.parent / "reference.fasta"
-        )
-    return checksum
-
-
-def hash_ref(ref_path: Path):
-    chroms_seqs = {}
-    for record in read_fasta_records(ref_path):
-        chroms_seqs[record.id] = str(record.sequence).upper()
-    chroms_seqs_sorted = {key: chroms_seqs[key] for key in sorted(chroms_seqs)}
-    string = ""
-    for chrom, seq in chroms_seqs_sorted.items():
-        string += f">{chrom}\n{seq}\n"
-    logger.debug(f"hash_ref() {string=}")
-    return hash_string(string.strip())
 
 
 def count_tsv_columns(bed_path: Path) -> int:
@@ -310,34 +224,6 @@ def validate(
         validate_bed_and_ref(bed_path=bed_path, ref_path=ref_path)
 
         scheme = parse_scheme_yaml(yml_path)
-        existing_primer_checksum = scheme.get("primer_checksum")
-        existing_reference_checksum = scheme.get("reference_checksum")
-        primer_checksum = hash_bed(bed_path)
-        reference_checksum = hash_ref(ref_path)
-        if (
-            existing_primer_checksum
-            and not primer_checksum == existing_primer_checksum
-            and not ignore_checksums
-        ):
-            raise RuntimeError(
-                f"Calculated and documented primer checksums do not match ({primer_checksum} and {existing_primer_checksum})"
-            )
-        elif not primer_checksum == existing_primer_checksum:
-            logger.warning(
-                f"Calculated and documented primer checksums do not match ({primer_checksum} and {existing_primer_checksum})"
-            )
-        if (
-            existing_reference_checksum
-            and not reference_checksum == existing_reference_checksum
-            and not ignore_checksums
-        ):
-            raise RuntimeError(
-                f"Calculated and documented reference checksums do not match ({reference_checksum} and {existing_reference_checksum})"
-            )
-        elif not reference_checksum == existing_reference_checksum:
-            logger.warning(
-                f"Calculated and documented reference checksums do not match ({reference_checksum} and {existing_reference_checksum})"
-            )
         logger.info(f"Validated {get_scheme_cname(scheme)}")
 
 
@@ -579,18 +465,18 @@ def get_scheme(
                     file_path.write_bytes(response.content)
         # Verify checksums from info.json
         info = json.loads((tmp_path / "info.json").read_text())
+        checksums = info.get("checksums", {})
         for field, filename in [
-            ("primer_file_sha256", "primer.bed"),
-            ("reference_file_sha256", "reference.fasta"),
+            ("primer_sha256", "primer.bed"),
+            ("reference_sha256", "reference.fasta"),
         ]:
-            expected = info.get(field)
+            expected = checksums.get(field)
             if expected:
                 actual = hashlib.sha256((tmp_path / filename).read_bytes()).hexdigest()
-                expected_hex = expected.removeprefix("sha256:")
-                if actual != expected_hex:
+                if actual != expected:
                     raise RuntimeError(
                         f"Checksum mismatch for {filename}: "
-                        f"expected {expected_hex}, got {actual}"
+                        f"expected {expected}, got {actual}"
                     )
         output_dir.mkdir(parents=True, exist_ok=True)
         shutil.copytree(tmp_path, output_dir, dirs_exist_ok=True)
