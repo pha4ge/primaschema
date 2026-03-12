@@ -34,6 +34,7 @@ dependencies = [
     "pandas>=1.5.3",
     "primalbedtools>=1.0.0",
     "pydantic>=2.0.0",
+    "httpx>=0.28.1",
     "pyyaml>=6.0.2",
     "vl-convert-python>=1.6.0",
 ]
@@ -44,18 +45,22 @@ primaschema = "primaschema.cli:main"
 [project.urls]
 Home = "https://github.com/pha4ge/primaschema"
 
-[project.optional-dependencies]
+[dependency-groups]
 dev = [
     "pytest",
     "pre-commit",
     "flit",
-    "ruff>=0.14.6"
+    "ruff>=0.14.6",
 ]
 
 [tool.flit.external-data]
 directory = "test"
 
 [tool.pytest.ini_options]
+markers = [
+    "network: tests that require network access",
+]
+addopts = "-m 'not network'"
 filterwarnings = [
     "ignore::pydantic.warnings.PydanticDeprecatedSince211:linkml.generators.*",
 ]

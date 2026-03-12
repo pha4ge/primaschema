@@ -277,6 +277,25 @@ def test_cli_create():
     run("rm -rf built/artic", cwd="./")
 
 
+@pytest.mark.network
+def test_get_scheme(tmp_path: Path):
+    output_dir = lib.get_scheme("artic/400/v4.1.0", output=tmp_path)
+    assert (output_dir / "info.json").exists()
+    assert (output_dir / "primer.bed").exists()
+    assert (output_dir / "reference.fasta").exists()
+
+
+def test_get_scheme_invalid_id():
+    with pytest.raises(ValueError, match="expected format"):
+        lib.get_scheme("artic/400")
+
+
+@pytest.mark.network
+def test_get_scheme_nonexistent(tmp_path: Path):
+    with pytest.raises(RuntimeError, match="HTTP"):
+        lib.get_scheme("nonexistent/999/v0.0.0", output=tmp_path)
+
+
 def test_rebuild_syncs_metadata_from_path(tmp_path: Path):
     src = data_dir / "auto-normalisation/test/400/v2.0.0"
     dest = tmp_path / "artic-sars-cov-2" / "1200" / "v9.9.9"

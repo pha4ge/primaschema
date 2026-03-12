@@ -14,11 +14,12 @@ from rich.console import Console
 from rich.traceback import install as install_rich_traceback
 
 from primaschema import (
+    DEFAULT_SCHEMES_URL,
     METADATA_FILE_NAME,
     PRIMER_FILE_NAME,
     REFERENCE_FILE_NAME,
 )
-from primaschema.lib import plot_primers
+from primaschema.lib import get_scheme, plot_primers
 from primaschema.schema.info import (
     Algorithm,
     Contributor,
@@ -1043,6 +1044,39 @@ def rebuild(
             sync_metadata=sync_metadata,
         )
         logger.info(f"Rebuilt scheme {scheme_label}")
+
+
+@app.command
+def get(
+    scheme: Annotated[
+        str,
+        Parameter(help="Scheme identifier, e.g. artic/400/5.4.2"),
+    ],
+    output: Annotated[
+        pathlib.Path,
+        Parameter(name=["--output", "-o"], help="Output directory"),
+    ] = pathlib.Path("."),
+    base_url: Annotated[
+        str,
+        Parameter(
+            name="--base-url",
+            env_var="PRIMER_SCHEMES_URL",
+            help="Base URL for the primer schemes repository",
+        ),
+    ] = DEFAULT_SCHEMES_URL,
+    all: Annotated[
+        bool,
+        Parameter(
+            name="--all",
+            help="Download all files including README.md and primer.svg",
+        ),
+    ] = False,
+):
+    """Download a primer scheme by identifier"""
+    output_dir = get_scheme(
+        scheme_id=scheme, output=output, base_url=base_url, all_files=all
+    )
+    logger.info(f"Scheme files written to {output_dir}")
 
 
 def main():

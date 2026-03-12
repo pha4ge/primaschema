@@ -8,6 +8,10 @@ METADATA_FILE_NAME: str = "info.json"
 PRIMER_FILE_NAME: str = "primer.bed"
 REFERENCE_FILE_NAME: str = "reference.fasta"
 
+DEFAULT_SCHEMES_URL = "https://github.com/pha4ge/primer-schemes/tree/v1b/schemes"
+SCHEME_FILES = [METADATA_FILE_NAME, PRIMER_FILE_NAME, REFERENCE_FILE_NAME]
+SCHEME_FILES_EXTRA = ["README.md", "work/primer.svg"]
+
 PKG_DIR = Path(
     os.environ.get(
         "PRIMASCHEMA_ROOT_PATH", Path(__file__).absolute().parent.parent.parent

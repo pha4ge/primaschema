@@ -2,10 +2,14 @@ import hashlib
 import json
 import logging
 import re
+import shutil
 import sys
+import tempfile
 from collections import defaultdict
 from pathlib import Path
 from typing import Dict, Literal, Optional, Tuple
+
+import httpx
 
 import altair as alt
 import linkml.validator
@@ -14,8 +18,11 @@ import yaml
 from linkml.generators.pydanticgen import PydanticGenerator
 
 from primaschema import (
+    DEFAULT_SCHEMES_URL,
     INDEX_HEADER_PATH,
     SCHEMA_DIR,
+    SCHEME_FILES,
+    SCHEME_FILES_EXTRA,
 )
 from primaschema.schema import bed, info
 from primaschema.util import read_fasta_records, reverse_complement, write_fasta_records
@@ -520,3 +527,72 @@ def subset(scheme_dir: Path, chrom: str, out_dir: Path = Path("built")) -> None:
     logger.info(
         f"Wrote subset of {len(subset_primers_df)}/{len(primers_df)} primers for {chrom} to {out_dir.resolve()}"
     )
+
+
+def _github_tree_url_to_raw(url: str) -> str:
+    """Convert a GitHub tree URL to a raw.githubusercontent.com URL."""
+    return url.replace("github.com", "raw.githubusercontent.com").replace(
+        "/tree/", "/refs/heads/"
+    )
+
+
+def get_scheme(
+    scheme_id: str,
+    output: Path = Path("."),
+    base_url: str = DEFAULT_SCHEMES_URL,
+    all_files: bool = False,
+) -> Path:
+    """Download a primer scheme by ID (name/amplicon_size/version) from a remote repository."""
+    parts = scheme_id.strip("/").split("/")
+    if len(parts) != 3:
+        raise ValueError(
+            f"Invalid scheme_id '{scheme_id}': expected format name/amplicon_size/version"
+        )
+    name, amplicon_size, version = parts
+    raw_base = _github_tree_url_to_raw(base_url.rstrip("/"))
+    scheme_url = f"{raw_base}/{scheme_id}"
+    output_dir = output / name / amplicon_size / version
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_path = Path(tmp_dir) / name / amplicon_size / version
+        tmp_path.mkdir(parents=True)
+        with httpx.Client() as client:
+            for filename in SCHEME_FILES:
+                url = f"{scheme_url}/{filename}"
+                response = client.get(url, follow_redirects=True)
+                if response.status_code != 200:
+                    raise RuntimeError(
+                        f"Failed to download {url}: HTTP {response.status_code}"
+                    )
+                (tmp_path / filename).write_bytes(response.content)
+            if all_files:
+                for filename in SCHEME_FILES_EXTRA:
+                    url = f"{scheme_url}/{filename}"
+                    response = client.get(url, follow_redirects=True)
+                    if response.status_code != 200:
+                        logger.warning(
+                            f"Could not download optional file {filename}: HTTP {response.status_code}"
+                        )
+                        continue
+                    file_path = tmp_path / filename
+                    file_path.parent.mkdir(parents=True, exist_ok=True)
+                    file_path.write_bytes(response.content)
+        # Verify checksums from info.json
+        info = json.loads((tmp_path / "info.json").read_text())
+        for field, filename in [
+            ("primer_file_sha256", "primer.bed"),
+            ("reference_file_sha256", "reference.fasta"),
+        ]:
+            expected = info.get(field)
+            if expected:
+                actual = hashlib.sha256((tmp_path / filename).read_bytes()).hexdigest()
+                expected_hex = expected.removeprefix("sha256:")
+                if actual != expected_hex:
+                    raise RuntimeError(
+                        f"Checksum mismatch for {filename}: "
+                        f"expected {expected_hex}, got {actual}"
+                    )
+        output_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(tmp_path, output_dir, dirs_exist_ok=True)
+    logger.info(f"Downloaded scheme {scheme_id} to {output_dir}")
+    return output_dir
