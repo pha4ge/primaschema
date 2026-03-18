@@ -1,3 +1,4 @@
+import gzip
 import json
 import logging
 import pathlib
@@ -15,11 +16,16 @@ from rich.traceback import install as install_rich_traceback
 
 from primaschema import (
     DEFAULT_SCHEMES_URL,
+    INDEX_FILE_NAME,
     METADATA_FILE_NAME,
     PRIMER_FILE_NAME,
     REFERENCE_FILE_NAME,
 )
 from primaschema.lib import get_scheme, plot_primers
+from primaschema.schema.index import (
+    PrimerSchemeIndex,
+    update_index,
+)
 from primaschema.schema.info import (
     Algorithm,
     Checksums,
@@ -33,10 +39,6 @@ from primaschema.schema.info import (
 )
 from primaschema.schema.info import (
     version as SCHEMA_VERSION,
-)
-from primaschema.schema.index import (
-    PrimerSchemeIndex,
-    update_index,
 )
 from primaschema.setup_logging import LogLevel, configure_logging
 from primaschema.util import (
@@ -846,7 +848,19 @@ def index(
         ),
     ],
     index_path: Optional[pathlib.Path] = None,
-    base_url: str = "",
+    base_url: Annotated[
+        str,
+        Parameter(
+            help="The URL source at which the primer schemes can be found. i.e `https://github.com/pha4ge/primer-schemes/main/v1b/schemes`",
+        ),
+    ] = "",
+    output_path: Annotated[
+        pathlib.Path,
+        Parameter(
+            validator=validators.Path(exists=True, dir_okay=True, file_okay=False),
+            help=f"The directory to write the {INDEX_FILE_NAME} and {INDEX_FILE_NAME}.gz",
+        ),
+    ] = pathlib.Path("."),
 ):
     """Build a JSON index of all primer schemes in a directory"""
     # Read in current index
@@ -855,18 +869,29 @@ def index(
     else:
         psi = PrimerSchemeIndex()
 
+    # Sanitise the base_url
+    base_url = base_url.strip("/")
+
     # find all primer schemes
     ps = []
     for ps_info in find_all_info_json(primer_schemes_path):
         logger.debug(f"found {ps_info}")
         ps.append(PrimerScheme.model_validate_json(ps_info.read_text()))
-
     update_index(ps, psi, base_url=base_url)
 
     # Ensure schemes is marked as set for exclude_unset=True
     psi.primerschemes = psi.primerschemes
 
-    print(psi.model_dump_json(exclude_unset=True, exclude_none=True))
+    index_str = psi.model_dump_json(
+        exclude_unset=True, exclude_none=True, ensure_ascii=True
+    )
+
+    # Write out the text and compressed index
+    (output_path / INDEX_FILE_NAME).write_text(index_str)
+    (output_path / (INDEX_FILE_NAME + ".gz")).write_bytes(
+        gzip.compress(index_str.encode("utf-8"))
+    )
+    logger.debug(f"wrote {INDEX_FILE_NAME} to `{output_path}`")
 
 
 # Validate commands
