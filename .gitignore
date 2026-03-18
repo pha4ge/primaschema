@@ -134,3 +134,5 @@ dmypy.json
 
 built/
 test/data/built
+# test schemes repo
+primerschemes/ 

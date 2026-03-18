@@ -7,7 +7,8 @@ prefixes:
   schema: http://schema.org/
   ORCID: http://identifiers.org/orcid/
   GENEPIO: http://purl.obolibrary.org/obo/GENEPIO_
-  IAO: "https://bioregistry.io/reference/iao:"
+  IAO: "http://purl.obolibrary.org/obo/IAO_"
+  EDAM: "http://edamontology.org/data_"
 default_curi_maps:
   - semweb_context
 imports:
@@ -18,25 +19,34 @@ classes:
   PrimerScheme:
     tree_root: true
     description: "A tiled amplicon PCR primer scheme definition"
+    #rules:
+    #  - description: "Require version suffix for ref selection"
+    #    preconditions:
+    #      slot_conditions:
+    #        version:
+    #          pattern: "^v\\d+\\.\\d+\\.\\d+$"
+    #    postconditions:
+    #      slot_conditions:
+    #        ref_selections:
+    #          maximum_cardinality: 0
     slots:
       - schema_version
       - name
       - amplicon_size
       - version
-      - organism
-      - source_url
-      - definition_url
+      - contributors
+      - target_organisms
       - aliases
       - license
       - status
+      - tags
       - derived_from
-      - developers
       - citations
       - notes
       - vendors
-      - masks
-      - primer_checksum
-      - reference_checksum
+      - algorithm
+      - checksums
+      - ref_selections
 
   Vendor:
     class_uri: GENEPIO:0100674
@@ -51,25 +61,63 @@ classes:
         slot_uri: GENEPIO:0100693
         description: "Vendor specific kit name for primer kit"
 
-  Mask:
-    description: "A region to mask out, with zero-based, half open coordinates"
+  Contributor:
+    class_uri: IAO:contributor
+    description: "Person or organisation who contributed to primer scheme development"
     attributes:
-      reference:
-        description: "Name (ID) of the reference sequence"
-        required: true
       name:
-        description: "Name of the region"
+        slot_uri: IAO:0000590 # A textual entity that denotes a particular in reality.
+        description: "The name of the person or organisation"
         required: true
-      start:
-        description: "Start coordinate of the region"
-        range: integer
-        minimum_value: 1
+      orcid_id:
+        slot_uri: IAO:0000708
+        description: "ORCID iD ('Open Researcher and Contributor IDentifier') of a person"
+      email:
+        slot_uri: IAO:0000429
+        description: "Contact email"
+        pattern: "^[\\w\\-\\.]+@([\\w-]+\\.)+[\\w-]{2,}$"
+
+  Algorithm:
+    class_uri: IAO:0000064
+    description: "Algorithm used to generate the primer scheme"
+    attributes:
+      name:
+        description: "The name of the Algorithm"
         required: true
-      end:
-        description: "End coordination of the region"
-        range: integer
-        minimum_value: 1
-        required: true
+      version:
+        slot_uri: IAO:0000129
+        description: "The version of the Algorithm"
+
+  Checksums:
+    description: "SHA256 checksums for scheme files"
+    attributes:
+      primer_sha256:
+        description: "SHA256 checksum for the primer scheme BED file"
+        pattern: "^[a-fA-F0-9]{64}$"
+      reference_sha256:
+        description: "SHA256 checksum for the reference FASTA file"
+        pattern: "^[a-fA-F0-9]{64}$"
+
+  RefSelection:
+    attributes:
+      file_sha256:
+        description: SHA256 checksum for the reference selection file
+        pattern: "^[a-fA-F0-9]{64}$"
+      file_name:
+        description: File name of the reference selection file
+      chromosome:
+        description: The chromosome in the primerbed file for which this provides reference selection
+
+  TargetOrganism:
+    class_uri: EDAM:1869
+    description: "The organisms targeted by this primer scheme"
+    attributes:
+      common_name:
+        slot_uri: EDAM:1874
+        description: The common name of the organism
+      ncbi_tax_id:
+        slot_uri: EDAM:1179
+        description: A stable unique identifier for each taxon (for a species, a family, an order, or any other group) in the NCBI taxonomy database
 
 slots:
   schema_version:
@@ -82,24 +130,28 @@ slots:
     description: The canonical name of the primer scheme (lowercase)
     pattern: "^[\\da-z0-9_.-]+$"
   version:
+    description: The semantic version of the scheme (v.{x}.{y}.{z})
     required: true
-    pattern: "^[\\da-z0-9_.-]+$"
-  display_name:
-    description: The human-friendly display name of the primer scheme
-  organism:
-    slot_uri: GENEPIO:0100682
+    pattern: "^v\\d+\\.\\d+\\.\\d+(-[a-z0-9]+)?$"
+  contributors:
+    description: Individuals, organisations, or institutions that have contributed to the development
     required: true
-    description: The organism against which this primer scheme is targeted. Lowercase, e.g. sars-cov-2
+    multivalued: true
+    inlined_as_list: true
+    range: Contributor
+  target_organisms:
+    slot_uri: EDAM:1869 # GENEPIO:0100682 maybe custom
+    required: true
+    description: The organism against which this primer scheme is targeted.
+    range: TargetOrganism
+    multivalued: true
+    inlined_as_list: true
+
   aliases:
     slot_uri: GENEPIO:0100670
     description: Aliases for primer scheme name
     multivalued: true
     inlined_as_list: true
-  developers:
-    slot_uri: GENEPIO:0100673
-    description: Persons or organisations responsible for developing the primer scheme
-    required: true
-    multivalued: true
   vendors:
     description: "Vendors where one can purchase the primers described in the amplicon scheme or a kit containing these primers"
     multivalued: true
@@ -111,11 +163,6 @@ slots:
     range: integer
     required: true
     minimum_value: 1
-  definition_url:
-    slot_uri: GENEPIO:0100683
-    description: "GitHub URL of PHA4GE compatible primer scheme scheme definition"
-  source_url:
-    description: "Source URL of primer scheme BED file, if available, e.g. GitHub repository URL"
   notes:
     description: "Notes about the amplicon primer scheme"
     slot_uri: GENEPIO:0100672
@@ -126,43 +173,58 @@ slots:
     slot_uri: GENEPIO:0100681
     description: "The status of this primer scheme (e.g. published, deprecated)"
     range: SchemeStatus
-    ifabsent: string(PUBLISHED)
+    required: true
   license:
+    range: SchemeLicense
     description: "License under which the primer scheme is distributed"
+    ifabsent: SchemeLicense(CC-BY-SA-4.0)
   citations:
     slot_uri: IAO:0000301
     description: "URLs of publications describing the scheme (DOIs preferred when available)"
     multivalued: true
     inlined_as_list: true
-  primer_checksum:
-    slot_uri: GENEPIO:0100675
-    description: "Checksum for the primer scheme BED file, in format checksum_type:checksum, where checksum_type is lowercase name of checksum generator e.g. primaschema"
-  reference_checksum:
-    description: "Checksum for the reference FASTA file, in format checksum_type:checksum, where checksum_type is lowercase name of checksum generator e.g. primaschema"
+  checksums:
+    description: "SHA256 checksums for scheme files"
+    range: Checksums
+    inlined: true
   derived_from:
     slot_uri: GENEPIO:0100671
     description: "Canonical name of the primer scheme from which this scheme was derived"
-  person_name:
-    slot_uri: schema:name
-    required: true
-    description: "The name of a natural person"
-  orcid:
-    description: "ORCID ('Open Researcher and Contributor IDentifier') of a person"
-  organisation_name:
-    required: true
-    description: "The name of an organisation"
-  home_page:
-    description: "A link to the home page of an organisation"
-  masks:
-    description: "Regions of the reference genome that should be masked out with N"
+  tags:
+    description: "Tags to describe the primer scheme"
+    range: SchemeTag
     multivalued: true
     inlined_as_list: true
-    range: Mask
+  algorithm:
+    description: "The algorithm (if any) used to generate this primer scheme"
+    range: Algorithm
+    inlined_as_list: true
+  ref_selections:
+    description: "Optional reference selections"
+    range: RefSelection
+    multivalued: true
+    inlined_as_list: true
+    required: false
 
 enums:
   SchemeStatus:
     description: "Status of this amplicon primer scheme"
     permissible_values:
-      PUBLISHED:
-      DEPRECATED:
       DRAFT:
+      TESTED:
+      VALIDATED:
+      DEPRECATED:
+      WITHDRAWN:
+  SchemeLicense:
+    description: "License under which the primer scheme is distributed"
+    permissible_values:
+      CC-BY-SA-4.0:
+  SchemeTag:
+    description: "Tag for this primer scheme"
+    permissible_values:
+      WASTE-WATER:
+      CLINICAL:
+      FULL-GENOME:
+      MULTI-TARGET:
+      PANEL:
+      QPCR:

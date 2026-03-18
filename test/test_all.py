@@ -1,11 +1,14 @@
+import shutil
 import subprocess
-
 from pathlib import Path
 
 import pytest
 
+import primaschema.cli as create_module
 import primaschema.lib as lib
-
+import primaschema.validate as validate_module
+from primaschema.schema.info import PrimerScheme
+from primaschema.util import sha256_checksum
 
 data_dir = Path("test/data")
 
@@ -16,106 +19,13 @@ def run(cmd, cwd=data_dir):  # Helper for CLI testing
     )
 
 
-def test_cli_version():
-    run("primaschema --version")
-
-
-def test_hash_ref():
-    assert (
-        lib.hash_ref(
-            "test/data/primer-schemes/schemes/sars-cov-2/eden/2500/v1.0.0/reference.fasta"
-        )
-        == "primaschema:b1acd7163146bf17"
-    )
-
-
-def test_cli_hash_ref():
-    run_cmd = run(
-        "primaschema hash-ref primer-schemes/schemes/sars-cov-2/eden/2500/v1.0.0/reference.fasta"
-    )
-    assert "primaschema:b1acd7163146bf17" in run_cmd.stdout
-
-
-def test_cli_hash_primer_bed():
-    run_cmd = run(
-        "primaschema hash-bed primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0/primer.bed"
-    )
-    assert "primaschema:3ef3e7bb23008684" in run_cmd.stdout
-
-
-def test_cli_scheme_bed():
-    run_cmd = run(
-        "primaschema hash-bed primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0/scheme.bed"
-    )
-    assert "primaschema:3ef3e7bb23008684" in run_cmd.stdout
-
-
-def test_artic_v41_scheme_hash_matches_primer_hash():
-    scheme_bed_hash = lib.hash_scheme_bed(
-        "test/data/primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0/scheme.bed",
-        "test/data/primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0/reference.fasta",
-    )
-    primer_bed_hash = lib.hash_primer_bed(
-        "test/data/primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0/primer.bed"
-    )
-    assert scheme_bed_hash == primer_bed_hash
-
-
-def test_valid_eden_v1():
-    lib.validate(
-        data_dir / "primer-schemes/schemes/sars-cov-2/eden/2500/v1.0.0",
-    )
-    lib.validate(
-        data_dir / "primer-schemes/schemes/sars-cov-2/eden/2500/v1.0.0",
-        full=True,
-    )
-
-
-def test_valid_artic_v41():
-    lib.validate(
-        data_dir / "primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0",
-    )
-
-
-def test_checksum_case_normalisation():
-    assert lib.hash_bed(
-        data_dir / "primer-schemes/schemes/sars-cov-2/eden/2500/v1.0.0/primer.bed"
-    ) == lib.hash_bed(data_dir / "different-case/eden.modified.primer.bed")
-
-
-def test_cli_valid_recursive():
-    run("primaschema validate --recursive primer-schemes")
-
-
-def test_valid_rebuild():
-    lib.validate(
-        data_dir / "primer-schemes/schemes/sars-cov-2/eden/2500/v1.0.0",
-        rebuild=True,
-    )
-
-
-def test_hash_bed():
-    lib.hash_bed(
-        data_dir / "primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0/primer.bed"
-    )
-    lib.hash_bed(
-        data_dir / "primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0/scheme.bed"
-    )
-
-
-def test_build():
-    run("primaschema build primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0")
-    run("rm -rf artic-v4.1.0")
-
-
-def test_build_recursive():
-    lib.build(data_dir / "primer-schemes", recursive=True)
-    run("rm -rf built")
-
-
-def test_build_manifest():
-    lib.build_manifest(root_dir=data_dir / "primer-schemes")
-    run("rm -rf built index.json", cwd="./")
+def test_build_index(tmp_path: Path):
+    src = data_dir / "primer-schemes"
+    dest = tmp_path / "primer-schemes"
+    shutil.copytree(src, dest)
+    lib.build_index(root_dir=dest, out_dir=tmp_path)
+    index_path = tmp_path / "index.json"
+    assert index_path.exists()
 
 
 def test_primer_bed_to_scheme_bed():
@@ -149,16 +59,6 @@ def test_scheme_bed_to_primer_bed():
     assert bed_str == expected_bed_str
 
 
-def test_diff():
-    run_cmd = run(
-        "primaschema diff primer-schemes/schemes/sars-cov-2/midnight/1200/v1.0.0/primer.bed primer-schemes/schemes/sars-cov-2/midnight/1200/v2.0.0/primer.bed"
-    )
-    assert (
-        """SARS-CoV-2_28_LEFT_2""" in run_cmd.stdout.strip()
-        and len(run_cmd.stdout.strip().split("\n")) == 2
-    )
-
-
 def test_calculate_intervals():
     all_intervals = lib.amplicon_intervals(
         data_dir / "primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0/primer.bed"
@@ -167,13 +67,6 @@ def test_calculate_intervals():
     intervals = all_intervals["MN908947.3"]
     assert "SARS-CoV-2_99" in intervals
     assert intervals["SARS-CoV-2_99"] == (29452, 29854)
-
-
-def test_print_intervals():
-    run_cmd = run(
-        "primaschema show-intervals primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0/primer.bed"
-    )
-    assert """MN908947.3\t29452\t29854\tSARS-CoV-2_99\n""" in run_cmd.stdout
 
 
 def test_plot_single_ref_chrom_ref():
@@ -231,6 +124,86 @@ MN908947.3	705	727	SARS-CoV-2_2_RIGHT_1	2	-	ATAAGGATCAGTGCCAAGCTCG"""
     )
 
 
+def _copy_scheme(tmp_path: Path, rel_path: str) -> Path:
+    src = data_dir / rel_path
+    dest = tmp_path / rel_path
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(src, dest)
+    return dest
+
+
+def _copy_scheme_to(src_rel_path: str, dest: Path) -> Path:
+    src = data_dir / src_rel_path
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(src, dest)
+    return dest
+
+
+def test_validate_autonormalize_primer_bed(tmp_path: Path):
+    scheme_dir = _copy_scheme(
+        tmp_path,
+        "auto-normalisation/test/400/v2.0.0",
+    )
+    info_path = scheme_dir / "info.json"
+    primer_path = scheme_dir / "primer.bed"
+    primer_scheme = PrimerScheme.model_validate_json(info_path.read_text())
+
+    assert sha256_checksum(primer_path) != primer_scheme.checksums.primer_sha256
+
+    validate_module.validate(info_path, strict=True, fix=True)
+
+    assert sha256_checksum(primer_path) == primer_scheme.checksums.primer_sha256
+
+
+def test_validate_autonormalize_reference_fasta(tmp_path: Path):
+    scheme_dir = _copy_scheme(
+        tmp_path,
+        "auto-normalisation/test/400/v2.0.0",
+    )
+    info_path = scheme_dir / "info.json"
+    reference_path = scheme_dir / "reference.fasta"
+    primer_scheme = PrimerScheme.model_validate_json(info_path.read_text())
+
+    assert sha256_checksum(reference_path) != primer_scheme.checksums.reference_sha256
+
+    validate_module.validate(info_path, strict=True, fix=True)
+
+    assert sha256_checksum(reference_path) == primer_scheme.checksums.reference_sha256
+
+
+def test_validate_all_aggregates_errors_create_cli(tmp_path: Path):
+    bad1 = tmp_path / "bad1" / "999" / "v0.0.1"
+    bad2 = tmp_path / "bad2" / "999" / "v0.0.2"
+    _copy_scheme_to("auto-normalisation/test/400/v2.0.0", bad1)
+    _copy_scheme_to("auto-normalisation/test/400/v2.0.0", bad2)
+
+    with pytest.raises(ValueError) as exc:
+        create_module.validate(
+            path=tmp_path,
+            all=True,
+            additional_linkml=False,
+            strict=True,
+        )
+
+    msg = str(exc.value)
+    assert "bad1" in msg
+    assert "bad2" in msg
+
+
+def test_validate_all_aggregates_errors_module(tmp_path: Path):
+    bad1 = tmp_path / "bad1" / "999" / "v0.0.1"
+    bad2 = tmp_path / "bad2" / "999" / "v0.0.2"
+    _copy_scheme_to("auto-normalisation/test/400/v2.0.0", bad1)
+    _copy_scheme_to("auto-normalisation/test/400/v2.0.0", bad2)
+
+    with pytest.raises(ValueError) as exc:
+        validate_module.validate_all(tmp_path, additional_linkml=False, strict=True)
+
+    msg = str(exc.value)
+    assert "bad1" in msg
+    assert "bad2" in msg
+
+
 def test_invalid_missing_field():
     with pytest.raises(ValueError):  # Also catches pydantic.ValidationError
         lib.validate(data_dir / "broken/info-yml/missing-field")
@@ -250,10 +223,71 @@ def test_subset():
     run("rm -rf built", cwd="./")
 
 
-def test_commented_bed():
-    lib.validate(data_dir / "bed-comment")
+# def test_commented_bed():
+#     lib.validate(data_dir / "bed-comment")
 
 
 def test_dev_scheme():
-    # lib.validate(data_dir / "dev-scheme")
+    lib.validate(data_dir / "dev-scheme")
     lib.validate(data_dir / "dev-scheme", full=True)
+
+
+def test_cli_create():
+    run("mkdir -p built && rm -rf built/artic", cwd="./")
+    run(
+        "uv run primaschema create"
+        " --name artic"
+        " --amplicon-size 400"
+        " --version v4.1.0"
+        " --contributors 'ARTIC network'"
+        " --target-organisms sars-cov-2"
+        " --status DEPRECATED"
+        " --bed-path test/data/dev-scheme/primer.bed"
+        " --reference-path test/data/dev-scheme/reference.fasta"
+        " --primer-schemes-path built",
+        cwd="./",
+    )
+    assert Path("built/artic/400/v4.1.0/primer.bed").exists()
+    assert Path("built/artic/400/v4.1.0/reference.fasta").exists()
+    assert Path("built/artic/400/v4.1.0/info.json").exists()
+    run("rm -rf built/artic", cwd="./")
+
+
+@pytest.mark.network
+def test_get_scheme(tmp_path: Path):
+    output_dir = lib.get_scheme("artic/400/v4.1.0", output=tmp_path)
+    assert (output_dir / "info.json").exists()
+    assert (output_dir / "primer.bed").exists()
+    assert (output_dir / "reference.fasta").exists()
+
+
+def test_get_scheme_invalid_id():
+    with pytest.raises(ValueError, match="expected format"):
+        lib.get_scheme("artic/400")
+
+
+@pytest.mark.network
+def test_get_scheme_nonexistent(tmp_path: Path):
+    with pytest.raises(RuntimeError, match="HTTP"):
+        lib.get_scheme("nonexistent/999/v0.0.0", output=tmp_path)
+
+
+def test_rebuild_syncs_metadata_from_path(tmp_path: Path):
+    src = data_dir / "auto-normalisation/test/400/v2.0.0"
+    dest = tmp_path / "artic-sars-cov-2" / "1200" / "v9.9.9"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(src, dest)
+    info_path = dest / "info.json"
+    primer_scheme = PrimerScheme.model_validate_json(info_path.read_text())
+    assert primer_scheme.name != "artic-sars-cov-2"
+    assert primer_scheme.amplicon_size != 1200
+    assert primer_scheme.version != "v9.9.9"
+
+    from primaschema.cli import _rebuild_one
+
+    _rebuild_one(info_path, sync_metadata=True)
+
+    updated_scheme = PrimerScheme.model_validate_json(info_path.read_text())
+    assert updated_scheme.name == "artic-sars-cov-2"
+    assert updated_scheme.amplicon_size == 1200
+    assert updated_scheme.version == "v9.9.9"

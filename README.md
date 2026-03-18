@@ -2,27 +2,36 @@
 
 # Primaschema
 
-**🚨 Migration to v1 scheme specification in progress**
+## Dev notes
+
+`uv run pytest -v test/test_all.py::test_dev_scheme`
 
 A toolkit for fetching, validating and interrogating tiled amplicon PCR primer scheme definitions. Provides convenient programmatic accesss to the [PHA4GE primer-schemes repository](https://github.com/pha4ge/primer-schemes), a community repository of tiled amplicons primer schemes.
 
-
-## Install (Python 3.8+)
+## Install (Python 3.12+)
 
 ```shell
-# Latest stable release
-pip install primaschema
+uv tool install primaschema
+```
 
-# From main branch
-git clone https://github.com/pha4ge/primaschema
-pip install ./primaschema
+### Development
 
-# Development
+```shell
 git clone https://github.com/pha4ge/primaschema.git
 cd primaschema
-pip install --editable '.[dev]'
-pre-commit install
-pytest
+uv sync --all-extras
+uv run primaschema --help
+uv run pytest
+uv run pre-commit install
+uv run pre-commit run --all-files
+```
+
+`uv sync --all-extras` installs optional dependencies, including the `dev` extra (e.g. `pytest`, `pre-commit`, `ruff`) defined in `pyproject.toml`.
+
+The Pydantic model (`src/primaschema/schema/info.py`) is generated from the LinkML schema (`src/primaschema/schema/info.yml`). After modifying the schema, regenerate with:
+
+```shell
+uv run gen-pydantic src/primaschema/schema/info.yml --meta None > src/primaschema/schema/info.py
 ```
 
 Some Primaschema commands use components from the [primer-schemes](https://github.com/pha4ge/primer-schemes) repository. To show Primaschema where to find these, create the environment variable `PRIMER_SCHEMES_PATH` pointing to the location of the primer-schemes directory on your machine:
@@ -35,6 +44,21 @@ export PRIMER_SCHEMES_PATH="/path/to/primer-schemes"
 
 
 ## Usage
+
+### Scheme creation
+
+```bash
+mkdir -p built && rm -rf built/artic && uv run primaschema create \
+  --name artic \
+  --amplicon-size 400 \
+  --version v4.1.0 \
+  --contributors "ARTIC network" \
+  --target-organisms "sars-cov-2" \
+  --status DEPRECATED \
+  --bed-path test/data/dev-scheme/primer.bed \
+  --reference-path test/data/dev-scheme/reference.fasta \
+  --primer-schemes-path built
+```
 
 ```
 % primaschema -h

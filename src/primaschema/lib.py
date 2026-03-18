@@ -1,54 +1,38 @@
 import hashlib
+import json
+import logging
 import re
 import shutil
 import sys
-
+import tempfile
 from collections import defaultdict
 from pathlib import Path
-from tempfile import TemporaryDirectory
-from typing import Literal, Optional, Dict, Tuple
+from typing import Dict, Literal, Optional, Tuple
 
-import linkml.validator
-import yaml
+import httpx
 
 import altair as alt
+import linkml.validator
 import pandas as pd
-
-from Bio import SeqIO
-
+import yaml
 from linkml.generators.pydanticgen import PydanticGenerator
 
-from . import (
-    logger,
-    MANIFEST_HEADER_PATH,
-    CACHE_DIR,
+from primaschema import (
+    DEFAULT_SCHEMES_URL,
+    INDEX_HEADER_PATH,
     SCHEMA_DIR,
-    SCHEMES_ARCHIVE_URL,
+    SCHEME_FILES,
+    SCHEME_FILES_EXTRA,
 )
+from primaschema.schema import bed, info
+from primaschema.util import read_fasta_records, reverse_complement, write_fasta_records
 
-from .schema import bed, info
-from . import util
-import json
-
+logger = logging.getLogger(__name__)
 
 SCHEME_BED_FIELDS = ["chrom", "chromStart", "chromEnd", "name", "poolName", "strand"]
 PRIMER_BED_FIELDS = SCHEME_BED_FIELDS + ["sequence"]
-HASHED_BED_FIELDS = [
-    "chrom",
-    "chromStart",
-    "chromEnd",
-    "poolName",
-    "strand",
-    "sequence",
-]
 POSITION_FIELDS = ["chromStart", "chromEnd"]
 MANDATORY_FILES = ("primer.bed", "reference.fasta", "info.yml")
-
-
-def hash_string(string: str) -> str:
-    """Normalise case, sorting, terminal spaces & return prefixed 64b of SHA256 hex"""
-    checksum = hashlib.sha256(str(string).strip().upper().encode()).hexdigest()[:16]
-    return f"primaschema:{checksum}"
 
 
 def parse_scheme_bed(bed_path: Path) -> pd.DataFrame:
@@ -102,127 +86,24 @@ def sort_primer_df(df: pd.DataFrame) -> pd.DataFrame:
     )[[*PRIMER_BED_FIELDS]]
 
 
-def normalise_primer_df(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Removes terminal whitespace and normalises case
-    Sorts by chromStart, chromEnd, poolName, strand, sequence
-    Removes duplicate records, collapsing alts with same coords if backfilled from ref
-    """
-    df["sequence"] = df["sequence"].str.strip().str.upper()
-    return sort_primer_df(df)
-
-
-def hash_primer_df(df: pd.DataFrame) -> str:
-    """
-    Returns prefixed SHA256 digest from stringified dataframe
-    """
-    normalised_df = normalise_primer_df(df)
-    string = normalised_df[[*HASHED_BED_FIELDS]].to_csv(index=False, header=False)
-    logger.debug(f"hash_primer_df() {string=}")
-    return hash_string(string)
-
-
-def hash_primer_bed(bed_path: Path):
-    """Hash a 7 column primer.bed file"""
-    df = parse_primer_bed(bed_path)
-    return hash_primer_df(df)
-
-
-def hash_scheme_bed(bed_path: Path, fasta_path: Path) -> str:
-    """
-    Hash a 6 column scheme.bed file by first converting to 7 column primer.bed
-    """
-    logger.info("Hashing scheme.bed using reference backfill")
-    ref_record = SeqIO.read(fasta_path, "fasta")
-    df = parse_scheme_bed(bed_path)
-    records = df.to_dict("records")
-    for r in records:
-        start_pos, end_pos = r["chromStart"], r["chromEnd"]
-        if r["strand"] == "+":
-            r["sequence"] = str(ref_record.seq[start_pos:end_pos])
-        elif r["strand"] == "-":
-            r["sequence"] = str(ref_record.seq[start_pos:end_pos].reverse_complement())
-        else:
-            raise RuntimeError(f"Invalid strand for BED record {r}")
-    bed7_df = pd.DataFrame(records)
-    return hash_primer_df(bed7_df)
-
-
 def convert_primer_bed_to_scheme_bed(bed_path: Path) -> str:
     df = parse_primer_bed(bed_path).drop("sequence", axis=1)
     return df.to_csv(sep="\t", header=False, index=False)
 
 
 def convert_scheme_bed_to_primer_bed(bed_path: Path, fasta_path: Path) -> str:
-    ids_seqs = SeqIO.to_dict(SeqIO.parse(fasta_path, "fasta"))
+    ids_seqs = {record.id: record.sequence for record in read_fasta_records(fasta_path)}
     df = parse_scheme_bed(bed_path)
     records = df.to_dict("records")
     for r in records:
         chrom = r["chrom"].partition(" ")[0]  # Use chrom name before first space
         start_pos, end_pos = r["chromStart"], r["chromEnd"]
         if r["strand"] == "+":
-            r["sequence"] = str(ids_seqs[chrom].seq[start_pos:end_pos])
+            r["sequence"] = str(ids_seqs[chrom][start_pos:end_pos])
         else:
-            r["sequence"] = str(
-                ids_seqs[chrom].seq[start_pos:end_pos].reverse_complement()
-            )
+            r["sequence"] = reverse_complement(ids_seqs[chrom][start_pos:end_pos])
     df = pd.DataFrame(records)
     return df.to_csv(sep="\t", header=False, index=False)
-
-
-def convert_vwf_to_primer_bed(vwf_path: Path, chrom: str = "chrom") -> str:
-    vwf_df = pd.read_csv(vwf_path, sep="\t")
-    bed_records = []
-    pool_counter = {}
-
-    for r in vwf_df.to_records("dict"):
-        amplicon_name = r["Amplicon_name"]
-        primer_name = r["Primer_name"]
-        orientation = r["Left_or_right"]
-        amplicon_number = int(amplicon_name.split("_")[-1])
-        pool_name = 1 if amplicon_number % 2 != 0 else 2
-        if amplicon_name not in pool_counter:
-            pool_counter[amplicon_name] = 1
-        else:
-            pool_counter[amplicon_name] += 1
-        strand = "+" if orientation == "left" else "-"
-        sequence = r["Sequence"]
-        start_pos = r["Position"]
-        bed_record = {}
-        bed_record["chrom"] = chrom
-        bed_record["chromStart"] = start_pos
-        bed_record["chromEnd"] = start_pos + len(sequence)
-        bed_record["name"] = primer_name
-        bed_record["poolName"] = str(pool_name)
-        bed_record["strand"] = strand
-        bed_record["sequence"] = sequence
-        bed_records.append(bed_record)
-
-    bed_df = pd.DataFrame(bed_records)
-    return bed_df.to_csv(sep="\t", header=False, index=False)
-
-
-def hash_bed(bed_path: Path) -> str:
-    bed_type = infer_bed_type(bed_path)
-    if bed_type == "primer":
-        checksum = hash_primer_bed(bed_path)
-    else:  # bed_type == "scheme"
-        checksum = hash_scheme_bed(
-            bed_path=bed_path, fasta_path=bed_path.parent / "reference.fasta"
-        )
-    return checksum
-
-
-def hash_ref(ref_path: Path):
-    chroms_seqs = {}
-    for record in SeqIO.parse(ref_path, "fasta"):
-        chroms_seqs[record.id] = str(record.seq).upper()
-    chroms_seqs_sorted = {key: chroms_seqs[key] for key in sorted(chroms_seqs)}
-    string = ""
-    for chrom, seq in chroms_seqs_sorted.items():
-        string += f">{chrom}\n{seq}\n"
-    logger.debug(f"hash_ref() {string=}")
-    return hash_string(string.strip())
 
 
 def count_tsv_columns(bed_path: Path) -> int:
@@ -248,18 +129,6 @@ def parse_scheme_yaml(path: Path) -> dict:
     """Parse and validate with Pydantic"""
     data = parse_yaml(path)
     return info.PrimerScheme(**data).model_dump()
-
-
-def dump(info_path: Path) -> str:
-    """
-    Read and validate an info.yaml file, then return it as JSON string
-
-    :param info_path: path to info.yaml or info.yml file
-    :return: JSON string representation of the validated scheme info
-    """
-    logger.debug(f"Reading and validating info file: {info_path}")
-    scheme_data = parse_scheme_yaml(info_path)
-    return json.dumps(scheme_data, indent=2)
 
 
 def validate_bed_and_ref(
@@ -294,8 +163,8 @@ def validate_bed_and_ref(
 
     # If a ref_path is supplied, populate the reference_lengths field of BedModel
     if ref_path:
-        records = SeqIO.parse(ref_path, "fasta")
-        reference_lengths = {r.id.partition(" ")[0]: len(r.seq) for r in records}
+        records = read_fasta_records(ref_path)
+        reference_lengths = {r.id: len(r.sequence) for r in records}
     else:
         reference_lengths = None
     return bed.BedModel(amplicons=amplicons, reference_lengths=reference_lengths)
@@ -355,34 +224,6 @@ def validate(
         validate_bed_and_ref(bed_path=bed_path, ref_path=ref_path)
 
         scheme = parse_scheme_yaml(yml_path)
-        existing_primer_checksum = scheme.get("primer_checksum")
-        existing_reference_checksum = scheme.get("reference_checksum")
-        primer_checksum = hash_bed(bed_path)
-        reference_checksum = hash_ref(ref_path)
-        if (
-            existing_primer_checksum
-            and not primer_checksum == existing_primer_checksum
-            and not ignore_checksums
-        ):
-            raise RuntimeError(
-                f"Calculated and documented primer checksums do not match ({primer_checksum} and {existing_primer_checksum})"
-            )
-        elif not primer_checksum == existing_primer_checksum:
-            logger.warning(
-                f"Calculated and documented primer checksums do not match ({primer_checksum} and {existing_primer_checksum})"
-            )
-        if (
-            existing_reference_checksum
-            and not reference_checksum == existing_reference_checksum
-            and not ignore_checksums
-        ):
-            raise RuntimeError(
-                f"Calculated and documented reference checksums do not match ({reference_checksum} and {existing_reference_checksum})"
-            )
-        elif not reference_checksum == existing_reference_checksum:
-            logger.warning(
-                f"Calculated and documented reference checksums do not match ({reference_checksum} and {existing_reference_checksum})"
-            )
         logger.info(f"Validated {get_scheme_cname(scheme)}")
 
 
@@ -392,79 +233,28 @@ def format_primer_bed(bed_path: Path) -> str:
     return sort_primer_df(df).to_csv(sep="\t", header=False, index=False)
 
 
-def build(
-    scheme_dir: Path,
-    out_dir: Path = Path("built"),
-    plot: bool = False,
-    nested: bool = False,  # Create nested output dir structure
-    recursive: bool = False,
-    ignore_checksums: bool = False,
-) -> None:
-    """
-    Validate and build a primer scheme given a scheme directory path.
-    Optionally do so recursively
-    """
-    if recursive:
-        for path in Path(scheme_dir).rglob("info.yml"):
-            if path.is_file() and path.name == "info.yml":
-                build(
-                    scheme_dir=path.parent,
-                    out_dir=out_dir,
-                    plot=plot,
-                    nested=True,
-                    ignore_checksums=ignore_checksums,
-                )
-    else:
-        validate(scheme_dir=scheme_dir, ignore_checksums=ignore_checksums)
-        scheme = parse_yaml(scheme_dir / "info.yml")
-        scheme_cname = get_scheme_cname(scheme)
-        if nested:
-            out_dir = Path(out_dir) / Path(scheme_cname)
-        else:
-            out_dir = Path(out_dir) / get_scheme_cname(scheme, sep="_")
-        try:
-            out_dir.mkdir(parents=True, exist_ok=True)
-        except FileExistsError:
-            raise FileExistsError(f"Output directory {out_dir} already exists")
-        scheme["primer_checksum"] = hash_bed(scheme_dir / "primer.bed")
-        scheme["reference_checksum"] = hash_ref(scheme_dir / "reference.fasta")
-        with open(out_dir / "info.yml", "w") as scheme_fh:
-            logger.debug(f"Writing info.yml to {out_dir}/info.yml")
-            yaml.dump(scheme, scheme_fh, sort_keys=False)
-        logger.debug(f"Copying primer.bed to {out_dir}/primer.bed")
-        with open(out_dir / "primer.bed", "w") as primer_fh:
-            primer_fh.write(format_primer_bed(scheme_dir / "primer.bed"))
-        logger.debug(f"Copying reference.fasta to {out_dir}/reference.fasta")
-        shutil.copy(scheme_dir / "reference.fasta", out_dir)
-        logger.debug(f"Writing scheme.bed to {out_dir}/scheme.bed")
-        scheme_bed_str = convert_primer_bed_to_scheme_bed(
-            bed_path=out_dir / "primer.bed"
-        )
-        with open(out_dir.resolve() / "scheme.bed", "w") as fh:
-            fh.write(scheme_bed_str)
-
-        if plot:
-            plot_primers(
-                bed_path=out_dir / "primer.bed", out_path=out_dir / "primer.svg"
-            )
-
-        logger.info(f"Built {scheme_cname}")
-
-
 def get_scheme_cname(scheme: dict, sep: Literal["/", "_"] = "/") -> str:
-    organism = str(scheme.get("organism", ""))
+    target_organisms = scheme.get("target_organisms", [])
+    if target_organisms:
+        first = target_organisms[0]
+        organism = (
+            first.get("common_name", "") if isinstance(first, dict) else str(first)
+        ) or ""
+    else:
+        organism = str(scheme.get("organism", ""))
     name = str(scheme["name"])
     amplicon_size = str(scheme.get("amplicon_size", ""))
     version = str(scheme["version"])
-    return sep.join([organism, name, amplicon_size, version])
+    parts = [p for p in [organism, name, amplicon_size, version] if p]
+    return sep.join(parts)
 
 
-def build_manifest(root_dir: Path, out_dir: Path = Path()):
-    """Build manifest of schemes inside the specified directory"""
+def build_index(root_dir: Path, out_dir: Path = Path()):
+    """Build index of schemes inside the specified directory"""
 
-    manifest = parse_yaml(MANIFEST_HEADER_PATH)
+    index_data = parse_yaml(INDEX_HEADER_PATH)
 
-    manifest_field_exclude = [
+    field_exclude = [
         "schema_version",
     ]
 
@@ -473,10 +263,10 @@ def build_manifest(root_dir: Path, out_dir: Path = Path()):
         scheme_path = root_dir
 
     schemes = []
-    organism_set = set([o["organism"] for o in manifest["organisms"]])
+    organism_set = set([o["organism"] for o in index_data["organisms"]])
     for scheme_info_path in scheme_path.glob("**/info.yml"):
         scheme = parse_yaml(scheme_info_path)
-        for field in manifest_field_exclude:
+        for field in field_exclude:
             if field in scheme:
                 del scheme[field]
         if scheme["organism"] not in organism_set:
@@ -485,43 +275,12 @@ def build_manifest(root_dir: Path, out_dir: Path = Path()):
             )
         schemes.append(scheme)
 
-    manifest["schemes"] = sorted(schemes, key=get_scheme_cname)
+    index_data["schemes"] = sorted(schemes, key=get_scheme_cname)
 
-    manifest_file_name = "index.json"
-    with open(out_dir / manifest_file_name, "w") as fh:
-        logger.info(f"Writing {manifest_file_name} to {out_dir}/{manifest_file_name}")
-        json.dump(manifest, fh, indent=4)
-
-
-def diff(bed1_path: Path, bed2_path: Path, only_positions: bool = False):
-    """Show symmetric differences between records in two primer.bed files"""
-    df1 = parse_primer_bed(bed1_path).assign(origin="bed1")
-    df2 = parse_primer_bed(bed2_path).assign(origin="bed2")
-    if only_positions:
-        column_subset = POSITION_FIELDS
-    else:
-        column_subset = PRIMER_BED_FIELDS
-    return pd.concat([df1, df2]).drop_duplicates(subset=column_subset, keep=False)
-
-
-def discordant_primers(scheme_dir: Path) -> pd.DataFrame:
-    """Show primer records with sequences not matching the reference sequence"""
-    primer_bed_path = scheme_dir / "primer.bed"
-    scheme_bed_path = scheme_dir / "scheme.bed"
-    with TemporaryDirectory() as temp_dir:
-        backfilled_bed_path = Path(temp_dir) / "primer.bed"
-        if not scheme_bed_path.exists():
-            with open(scheme_bed_path, "w") as fh:
-                fh.write(convert_primer_bed_to_scheme_bed(primer_bed_path))
-            scheme_bed_path = Path(temp_dir) / "scheme.bed"
-        with open(backfilled_bed_path, "w") as fh:
-            fh.write(
-                convert_scheme_bed_to_primer_bed(
-                    bed_path=scheme_dir / "scheme.bed",
-                    fasta_path=scheme_dir / "reference.fasta",
-                )
-            )
-        return diff(bed1_path=primer_bed_path, bed2_path=backfilled_bed_path)
+    index_file_name = "index.json"
+    with open(out_dir / index_file_name, "w") as fh:
+        logger.info(f"Writing {index_file_name} to {out_dir}/{index_file_name}")
+        json.dump(index_data, fh, indent=4)
 
 
 def amplicon_intervals(bed_path: Path) -> Dict[str, Dict[str, Tuple[int, int]]]:
@@ -620,7 +379,7 @@ def plot_primers(bed_path: Path, out_path: Path = Path("primer.html")) -> None:
     )
 
     combined_chart.interactive().save(str(out_path))
-    logger.info(f"Plot saved ({out_path})")
+    logger.debug(f"Plot saved ({out_path})")
 
 
 def subset(scheme_dir: Path, chrom: str, out_dir: Path = Path("built")) -> None:
@@ -628,15 +387,14 @@ def subset(scheme_dir: Path, chrom: str, out_dir: Path = Path("built")) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     reference_chroms = set()
     subset_record = None
-    for record in SeqIO.parse(scheme_dir / "reference.fasta", "fasta"):
+    for record in read_fasta_records(scheme_dir / "reference.fasta"):
         reference_chroms.add(record.id)
         if record.id == chrom:
             subset_record = record
     if not subset_record:
         raise ValueError(f"Chrom {chrom} not found in reference.fasta")
     else:
-        with open(out_dir / "reference.fasta", "w") as fh:
-            SeqIO.write(subset_record, fh, "fasta")
+        write_fasta_records(out_dir / "reference.fasta", [subset_record])
 
     primers_df = parse_primer_bed(scheme_dir / "primer.bed")
     primers_df["chrom"] = primers_df["chrom"].str.partition(" ")[0]
@@ -657,10 +415,70 @@ def subset(scheme_dir: Path, chrom: str, out_dir: Path = Path("built")) -> None:
     )
 
 
-def synchronise() -> None:
-    util.download_github_tarball(SCHEMES_ARCHIVE_URL, CACHE_DIR)
+def _github_tree_url_to_raw(url: str) -> str:
+    """Convert a GitHub tree URL to a raw.githubusercontent.com URL."""
+    return url.replace("github.com", "raw.githubusercontent.com").replace(
+        "/tree/", "/refs/heads/"
+    )
 
 
-# def fetch(string: str) -> None:
-#     with open(CACHE_DIR / "index.json", "r") as fh:
-#         manifest = json.load(fh)
+def get_scheme(
+    scheme_id: str,
+    output: Path = Path("."),
+    base_url: str = DEFAULT_SCHEMES_URL,
+    all_files: bool = False,
+) -> Path:
+    """Download a primer scheme by ID (name/amplicon_size/version) from a remote repository."""
+    parts = scheme_id.strip("/").split("/")
+    if len(parts) != 3:
+        raise ValueError(
+            f"Invalid scheme_id '{scheme_id}': expected format name/amplicon_size/version"
+        )
+    name, amplicon_size, version = parts
+    raw_base = _github_tree_url_to_raw(base_url.rstrip("/"))
+    scheme_url = f"{raw_base}/{scheme_id}"
+    output_dir = output / name / amplicon_size / version
+
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        tmp_path = Path(tmp_dir) / name / amplicon_size / version
+        tmp_path.mkdir(parents=True)
+        with httpx.Client() as client:
+            for filename in SCHEME_FILES:
+                url = f"{scheme_url}/{filename}"
+                response = client.get(url, follow_redirects=True)
+                if response.status_code != 200:
+                    raise RuntimeError(
+                        f"Failed to download {url}: HTTP {response.status_code}"
+                    )
+                (tmp_path / filename).write_bytes(response.content)
+            if all_files:
+                for filename in SCHEME_FILES_EXTRA:
+                    url = f"{scheme_url}/{filename}"
+                    response = client.get(url, follow_redirects=True)
+                    if response.status_code != 200:
+                        logger.warning(
+                            f"Could not download optional file {filename}: HTTP {response.status_code}"
+                        )
+                        continue
+                    file_path = tmp_path / filename
+                    file_path.parent.mkdir(parents=True, exist_ok=True)
+                    file_path.write_bytes(response.content)
+        # Verify checksums from info.json
+        info = json.loads((tmp_path / "info.json").read_text())
+        checksums = info.get("checksums", {})
+        for field, filename in [
+            ("primer_sha256", "primer.bed"),
+            ("reference_sha256", "reference.fasta"),
+        ]:
+            expected = checksums.get(field)
+            if expected:
+                actual = hashlib.sha256((tmp_path / filename).read_bytes()).hexdigest()
+                if actual != expected:
+                    raise RuntimeError(
+                        f"Checksum mismatch for {filename}: "
+                        f"expected {expected}, got {actual}"
+                    )
+        output_dir.mkdir(parents=True, exist_ok=True)
+        shutil.copytree(tmp_path, output_dir, dirs_exist_ok=True)
+    logger.info(f"Downloaded scheme {scheme_id} to {output_dir}")
+    return output_dir

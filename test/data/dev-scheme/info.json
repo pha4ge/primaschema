@@ -1,0 +1,41 @@
+{
+    "schema_version": "1.0.0a",
+    "name": "artic",
+    "amplicon_size": 400,
+    "version": "v4.1.0",
+    "contributors": [
+        {
+            "name": "ARTIC network",
+            "orcid_id": "1235678901234",
+            "email": "a@artic.network"
+        }
+    ],
+    "target_organisms": [
+        {
+            "common_name": "sars-cov-2"
+        }
+    ],
+    "aliases": [
+        "ARTIC/V4.1"
+    ],
+    "license": "CC-BY-SA-4.0",
+    "status": "DEPRECATED",
+    "derived_from": "sars-cov-2/artic/400/v4.0.0",
+    "citations": [
+        "https://doi.org/10.1101%2F2020.09.04.283077"
+    ],
+    "vendors": [
+        {
+            "organisation_name": "IDT",
+            "kit_name": "10011442"
+        },
+        {
+            "organisation_name": "Eurofins",
+            "home_page": "https://eurofinsgenomics.com"
+        }
+    ],
+    "checksums": {
+        "primer_sha256": "6640cd47ce429efbf074d646f002ff495939934121dfb2dd78a925da2d1e6036",
+        "reference_sha256": "b74b271645e893a879172021e14db7133dba85724cb1907a92628a359cb732ba"
+    }
+}
