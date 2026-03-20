@@ -86,4 +86,7 @@ def configure_logging(log_level: LogLevel | str | None = None) -> int:
     for logger_name in ("linkml", "linkml_runtime"):
         logging.getLogger(logger_name).setLevel(linkml_level)
 
+    httpx_level = logging.DEBUG if numeric_level <= logging.DEBUG else logging.WARNING
+    logging.getLogger("httpx").setLevel(httpx_level)
+
     return numeric_level
