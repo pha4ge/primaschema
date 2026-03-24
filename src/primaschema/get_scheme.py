@@ -412,6 +412,7 @@ def _download_scheme_entry(
     sanitisation: SanitisationMode,
     timeout: float | None,
     check_output_exists: bool,
+    suppress_log: bool,
     requested_id: str | None = None,
 ) -> Path:
     """Download and validate a single scheme into a target root directory.
@@ -513,7 +514,7 @@ def _download_scheme_entry(
             logger.debug(f"Cleaning up temporary download dir {tmp_dir_path}")
         raise
 
-    logger.info(f"Downloaded scheme {scheme.relative_path} to {output_dir}")
+    logger.info(f"Downloaded scheme {scheme.relative_path}")
     return output_dir
 
 
@@ -575,6 +576,7 @@ def download_schemes(
                     sanitisation,
                     timeout,
                     False,
+                    True,
                     scheme.relative_path,
                 ): scheme.relative_path
                 for scheme in schemes
@@ -602,4 +604,5 @@ def download_schemes(
                 shutil.copy2(source_dir / filename, dest_dir / filename)
             final_outputs.append(dest_dir)
 
+        logger.info(f"Downloaded {len(final_outputs)} scheme(s) to {output}")
         return final_outputs
