@@ -71,7 +71,7 @@ def _scheme_dir_from_url(url: str) -> Path:
 
 
 def _repo_bytes(*, primer_mutator=None):
-    def _read(url: str) -> bytes:
+    def _read(url: str, **_kwargs) -> bytes:
         scheme_dir = _scheme_dir_from_url(url)
         filename = Path(urlparse(url).path).name
         data = (scheme_dir / filename).read_bytes()

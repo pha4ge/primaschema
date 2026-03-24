@@ -27,6 +27,7 @@ from primaschema.get_scheme import (
     load_index,
     resolve_schemes,
 )
+from primaschema.get_scheme import DEFAULT_HTTP_TIMEOUT_SECONDS
 from primaschema.lib import plot_primers
 from primaschema.schema.index import (
     PrimerSchemeIndex,
@@ -1105,6 +1106,13 @@ def get(
             help="Sanitisation mode for downloaded files",
         ),
     ] = SanitisationMode.RAW,
+    timeout: Annotated[
+        float,
+        Parameter(
+            name="--timeout",
+            help="HTTP timeout in seconds",
+        ),
+    ] = DEFAULT_HTTP_TIMEOUT_SECONDS,
     all_schemes: Annotated[
         bool,
         Parameter(
@@ -1114,7 +1122,7 @@ def get(
     ] = False,
 ):
     """Download a primer scheme by identifier"""
-    psi = load_index(index)
+    psi = load_index(index, timeout=timeout)
     schemes = resolve_schemes(
         index=psi,
         scheme_id=scheme_id,
@@ -1127,6 +1135,7 @@ def get(
         strict=strict,
         force=force,
         sanitisation=sanitisation,
+        timeout=timeout,
     )
     if len(output_dirs) == 1:
         logger.info(f"Scheme files written to {output_dirs[0]}")

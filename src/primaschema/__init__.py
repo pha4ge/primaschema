@@ -10,8 +10,12 @@ REFERENCE_FILE_NAME: str = "reference.fasta"
 
 INDEX_FILE_NAME: str = "index.json"
 
-DEFAULT_SCHEMES_URL = "https://github.com/pha4ge/primer-schemes/tree/v1b/schemes"
-DEFAULT_INDEX_URL = "https://github.com/pha4ge/primer-schemes/tree/v1b/index.json"
+DEFAULT_SCHEMES_URL = (
+    "https://raw.githubusercontent.com/pha4ge/primer-schemes/v1b/schemes"
+)
+DEFAULT_INDEX_URL = (
+    "https://raw.githubusercontent.com/pha4ge/primer-schemes/v1b/index.json"
+)
 
 SCHEME_FILES = [METADATA_FILE_NAME, PRIMER_FILE_NAME, REFERENCE_FILE_NAME]
 SCHEME_FILES_EXTRA = ["README.md", "work/primer.svg"]
