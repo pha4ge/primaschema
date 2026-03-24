@@ -26,7 +26,7 @@ classifiers = [
 ]
 dependencies = [
     "altair>=5.3.0",
-    "cyclopts>=4.3.0",
+    "cyclopts>=4.10.0",
     "dnaio>=1.2.4",
     "jsonschema",
     "linkml>=1.9.4",
@@ -37,6 +37,7 @@ dependencies = [
     "httpx>=0.28.1",
     "pyyaml>=6.0.2",
     "vl-convert-python>=1.6.0",
+    "plotly>=6.6.0",
 ]
 
 [project.scripts]
@@ -51,6 +52,13 @@ dev = [
     "pre-commit",
     "flit",
     "ruff>=0.14.6",
+]
+docs = [
+    "cyclopts[mkdocs]>=4.10.0",
+        "mkdocstrings-python>=1.16.10",
+        "mkdocs>=1.6.1,<2",
+        "mkdocstrings[python]>=0.29.1,<0.30",
+        "mkdocs-material>=9.6.14,<10",
 ]
 
 [tool.flit.external-data]

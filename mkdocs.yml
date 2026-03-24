@@ -1,0 +1,24 @@
+site_name: primaschema
+
+theme:
+  name: "material"
+
+repo_url: https://github.com/pha4ge/primaschema
+
+plugins:
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          options:
+            docstring_style: google
+  - cyclopts
+
+markdown_extensions:
+  - toc:
+      toc_depth: 4
+  - admonition
+
+nav:
+  - Command Line Interface: cli.md
+  - API: api.md

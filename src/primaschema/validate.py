@@ -27,6 +27,14 @@ class ValidationEngine(enum.Enum):
 
 
 def validate_scheme_json_with_pydantic(info_path: Path) -> PrimerScheme:
+    """Validate an info.json file using the Pydantic model.
+
+    Args:
+        info_path: Path to info.json.
+
+    Returns:
+        Parsed PrimerScheme instance.
+    """
     # Use the derived pydantic model
     primer_scheme = PrimerScheme.model_validate_json(info_path.read_text())
     logger.info(f"Validated {info_path} with pydantic")
@@ -37,6 +45,14 @@ def validate_scheme_json_with_pydantic(info_path: Path) -> PrimerScheme:
 
 
 def validate_scheme_json_with_linkml(info_path: Path) -> None:
+    """Validate an info.json file using the LinkML schema.
+
+    Args:
+        info_path: Path to info.json.
+
+    Raises:
+        ValueError: If validation fails.
+    """
     # Use the linkml.validator to validate the output
     report = linkml.validator.validate(
         from_json(info_path.read_text()), str(SCHEMA_DIR / "info.yml"), "PrimerScheme"
@@ -49,11 +65,17 @@ def validate_scheme_json_with_linkml(info_path: Path) -> None:
 
 
 def validate_primer_bed(infopath: Path, strict: bool = False) -> Scheme:
-    """
-    Parses the adjacent primer.bed file with PBT
+    """Validate the adjacent primer.bed file using primalbedtools.
 
-    :param infopath: The path to the info.json metadata file
-    :type infopath: Path
+    Args:
+        infopath: Path to info.json metadata file.
+        strict: If True, fail on non-canonical primer ordering.
+
+    Returns:
+        Parsed Scheme object.
+
+    Raises:
+        ValueError: If primer.bed is invalid or order differs in strict mode.
     """
 
     primer_path = infopath.parent / PRIMER_FILE_NAME
@@ -72,6 +94,15 @@ def validate_primer_bed(infopath: Path, strict: bool = False) -> Scheme:
 
 
 def validate_name(infopath: Path, primer_scheme: PrimerScheme | None = None):
+    """Validate scheme name, amplicon size, and version against the path.
+
+    Args:
+        infopath: Path to info.json.
+        primer_scheme: Optional PrimerScheme instance to avoid re-parsing.
+
+    Raises:
+        ValueError: If any path component mismatches info.json.
+    """
     """
     Validate the schemename, ampliconsize, and schemeversion in the path, README.md, and info.json
     :raises ValueError: If a mismatch is found
@@ -110,6 +141,16 @@ def validate_name(infopath: Path, primer_scheme: PrimerScheme | None = None):
 
 
 def validate_readme(infopath: Path, primer_scheme: PrimerScheme | None = None):
+    """Validate README.md exists and contains scheme metadata.
+
+    Args:
+        infopath: Path to info.json.
+        primer_scheme: Optional PrimerScheme instance to avoid re-parsing.
+
+    Raises:
+        FileNotFoundError: If README.md is missing.
+        ValueError: If README.md content does not match info.json.
+    """
     # Use provided PrimerScheme (prevent duplication) or read in for validation
     if primer_scheme is None:
         primer_scheme = PrimerScheme.model_validate_json(infopath.read_text())
@@ -146,6 +187,16 @@ def validate_hashes(
     primer_scheme: PrimerScheme | None = None,
     fix: bool = False,
 ):
+    """Validate primer.bed and reference.fasta checksums against info.json.
+
+    Args:
+        infopath: Path to info.json.
+        primer_scheme: Optional PrimerScheme instance to avoid re-parsing.
+        fix: If True, rewrite files when normalised hashes match expected.
+
+    Raises:
+        ValueError: If hashes mismatch and cannot be normalised (or fix is False).
+    """
     # Use provided PrimerScheme (prevent duplication) or read in for validation
     if primer_scheme is None:
         primer_scheme = PrimerScheme.model_validate_json(infopath.read_text())
@@ -245,6 +296,18 @@ def validate(
     strict: bool = False,
     fix: bool = False,
 ):
+    """Validate a scheme directory (info.json, primer.bed, reference.fasta).
+
+    Args:
+        infopath: Path to info.json.
+        primer_scheme: Optional PrimerScheme instance to avoid re-parsing.
+        additional_linkml: If True, run LinkML validation.
+        strict: If True, enforce strict primer.bed ordering.
+        fix: If True, rewrite files when normalised hashes match expected.
+
+    Raises:
+        ValueError: If any validation step fails.
+    """
     logger.debug(f"Validating {'strict' if strict else ''} {infopath}")
     if additional_linkml:
         logger.debug(f"Validated with LinkML: {infopath}")
@@ -278,8 +341,15 @@ def validate(
 def validate_all(
     primer_schemes_path: Path, additional_linkml: bool = False, strict: bool = True
 ):
-    """
-    Recursively searches through the primer_schemes_path for {METADATA_FILE_NAME}
+    """Validate all schemes under a root directory.
+
+    Args:
+        primer_schemes_path: Root path to search for info.json files.
+        additional_linkml: If True, run LinkML validation.
+        strict: If True, enforce strict primer.bed ordering.
+
+    Raises:
+        ValueError: If any scheme fails validation.
     """
 
     errors: list[str] = []
