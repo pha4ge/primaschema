@@ -1,9 +1,11 @@
 from hashlib import sha256
+from io import BytesIO
 from pathlib import Path
 
 import dnaio
 
 from primaschema import METADATA_FILE_NAME
+from primaschema.schema.info import PrimerScheme
 
 
 def sha256_checksum(filename: Path):
@@ -32,6 +34,22 @@ def write_fasta_records(
     with dnaio.FastaWriter(path, line_length=line_length) as writer:
         for record in records:
             writer.write(record)
+
+
+def serialize_primer_scheme_json(primer_scheme: PrimerScheme) -> bytes:
+    return primer_scheme.model_dump_json(
+        indent=4,
+        exclude_unset=True,
+        exclude_none=True,
+    ).encode("utf-8")
+
+
+def serialize_fasta_records(records: list[dnaio.SequenceRecord]) -> bytes:
+    buffer = BytesIO()
+    with dnaio.open(buffer, mode="w", fileformat="fasta") as writer:
+        for record in records:
+            writer.write(record)
+    return buffer.getvalue()
 
 
 def reverse_complement(sequence: str) -> str:

@@ -1,6 +1,6 @@
-from typing import Optional
+from typing import Any, Generator, Optional
 
-from pydantic import BaseModel, Field, computed_field
+from pydantic import BaseModel, Field, model_validator
 
 from primaschema import METADATA_FILE_NAME, PRIMER_FILE_NAME, REFERENCE_FILE_NAME
 from primaschema.schema.info import (
@@ -62,30 +62,50 @@ class IndexPrimerScheme(BaseModel):
         default=None,
         description="""SHA256 checksums for scheme files""",
     )
-    base_url: str = Field(default="", exclude=True)
+    base_url: str = Field(default="", exclude=True)  # Only used for URL synthesis
+    primer_file_url: Optional[str] = Field(
+        default=None,
+        description="""URL to the primer.bed file""",
+    )
+    reference_file_url: Optional[str] = Field(
+        default=None,
+        description="""URL to the reference.fasta file""",
+    )
+    info_file_url: Optional[str] = Field(
+        default=None,
+        description="""URL to the info.json file""",
+    )
 
     # New fields
     @property
     def relative_path(self):
         return f"{self.name}/{self.amplicon_size}/{self.version}"
 
-    @computed_field
-    def primer_file_url(self) -> str:
-        if self.base_url:
-            return f"{self.base_url}/{self.relative_path}/{PRIMER_FILE_NAME}"
-        return f"{self.relative_path}/{PRIMER_FILE_NAME}"
-
-    @computed_field
-    def reference_file_url(self) -> str:
-        if self.base_url:
-            return f"{self.base_url}/{self.relative_path}/{REFERENCE_FILE_NAME}"
-        return f"{self.relative_path}/{REFERENCE_FILE_NAME}"
-
-    @computed_field
-    def info_file_url(self) -> str:
-        if self.base_url:
-            return f"{self.base_url}/{self.relative_path}/{METADATA_FILE_NAME}"
-        return f"{self.relative_path}/{METADATA_FILE_NAME}"
+    @model_validator(mode="after")
+    def _fill_urls(self):
+        # Preserve URLs from JSON; only synthesize missing ones
+        if not self.primer_file_url:
+            if self.base_url:
+                self.primer_file_url = (
+                    f"{self.base_url}/{self.relative_path}/{PRIMER_FILE_NAME}"
+                )
+            else:
+                self.primer_file_url = f"{self.relative_path}/{PRIMER_FILE_NAME}"
+        if not self.reference_file_url:
+            if self.base_url:
+                self.reference_file_url = (
+                    f"{self.base_url}/{self.relative_path}/{REFERENCE_FILE_NAME}"
+                )
+            else:
+                self.reference_file_url = f"{self.relative_path}/{REFERENCE_FILE_NAME}"
+        if not self.info_file_url:
+            if self.base_url:
+                self.info_file_url = (
+                    f"{self.base_url}/{self.relative_path}/{METADATA_FILE_NAME}"
+                )
+            else:
+                self.info_file_url = f"{self.relative_path}/{METADATA_FILE_NAME}"
+        return self
 
     @classmethod
     def from_primer_scheme(
@@ -116,6 +136,44 @@ class PrimerSchemeIndex(ConfiguredBaseModel):
         default_factory=dict,
         description="Index of primer schemes structured as {name: {amplicon_size: {version: scheme}}}",
     )
+
+    def flatten(self, data: Optional[Any] = None) -> list[IndexPrimerScheme]:
+        """
+        Recursively flattens values from any level of the dictionary.
+        If no data is provided, flattens the entire primerschemes dict.
+        """
+        return list(
+            self._yield_schemes(data if data is not None else self.primerschemes)
+        )
+
+    def _yield_schemes(self, data: Any) -> Generator[IndexPrimerScheme, None, None]:
+        """Recursive generator to find IndexPrimerScheme leaves."""
+        if isinstance(data, IndexPrimerScheme):
+            yield data
+        elif isinstance(data, dict):
+            for value in data.values():
+                yield from self._yield_schemes(value)
+        elif isinstance(data, list):
+            for item in data:
+                yield from self._yield_schemes(item)
+
+    def get_schemes_from_index(
+        self,
+        name: str,
+        amplicon_size: Optional[int | str] = None,
+        version: Optional[str] = None,
+    ) -> list[IndexPrimerScheme]:
+        """
+        Returns all schemes matching the provided criteria.
+        """
+        data: Any = self.primerschemes.get(name, {})
+
+        if amplicon_size:
+            data = data.get(int(amplicon_size), {})
+            if version:
+                data = data.get(version, {})
+
+        return self.flatten(data)
 
     def add_index_primer_scheme(self, index: IndexPrimerScheme, strict=True):
         # Get or create the substructure

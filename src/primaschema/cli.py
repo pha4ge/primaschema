@@ -15,13 +15,19 @@ from rich.console import Console
 from rich.traceback import install as install_rich_traceback
 
 from primaschema import (
-    DEFAULT_SCHEMES_URL,
+    DEFAULT_INDEX_URL,
     INDEX_FILE_NAME,
     METADATA_FILE_NAME,
     PRIMER_FILE_NAME,
     REFERENCE_FILE_NAME,
 )
-from primaschema.lib import get_scheme, plot_primers
+from primaschema.get_scheme import (
+    SanitisationMode,
+    download_schemes,
+    load_index,
+    resolve_schemes,
+)
+from primaschema.lib import plot_primers
 from primaschema.schema.index import (
     PrimerSchemeIndex,
     update_index,
@@ -44,6 +50,7 @@ from primaschema.setup_logging import LogLevel, configure_logging
 from primaschema.util import (
     find_all_info_json,
     read_fasta_records,
+    serialize_primer_scheme_json,
     sha256_checksum,
     write_fasta_records,
 )
@@ -176,12 +183,8 @@ def _save_and_rebuild_readme(
     """Saves the PrimerScheme to info.json and rebuilds the README."""
     # Save info.json
     logger.debug(f"Writing info.json to {info_path}")
-    with open(info_path, "w") as f:
-        f.write(
-            primer_scheme.model_dump_json(
-                exclude_unset=True, exclude_none=True, indent=4
-            )
-        )
+    info_bytes = serialize_primer_scheme_json(primer_scheme)
+    info_path.write_bytes(info_bytes)
 
     # Regenerate README
     scheme_dir = info_path.parent
@@ -289,9 +292,8 @@ def generate_readme(path: pathlib.Path, primer_scheme: PrimerScheme):
         readme.write("## Details\n\n")
 
         # Write the details into the readme
-        readme.write(
-            f"""```json\n{primer_scheme.model_dump_json(indent=4, exclude_unset=True, exclude_none=True)}\n```\n\n"""
-        )
+        details_json = serialize_primer_scheme_json(primer_scheme).decode("utf-8")
+        readme.write(f"""```json\n{details_json}\n```\n\n""")
 
         if primer_scheme.license == SchemeLicense.CC_BY_SA_4FULL_STOP0:
             readme.write(LICENSE_TXT_CC_BY_SA_4_0)
@@ -1059,35 +1061,77 @@ def rebuild(
 
 @app.command
 def get(
-    scheme: Annotated[
-        str,
-        Parameter(help="Scheme identifier, e.g. artic/400/5.4.2"),
-    ],
+    scheme_id: Annotated[
+        Optional[str],
+        Parameter(
+            help="Scheme identifier, e.g. artic/400/v5.4.2 (required unless --all)"
+        ),
+    ] = None,
     output: Annotated[
         pathlib.Path,
         Parameter(name=["--output", "-o"], help="Output directory"),
     ] = pathlib.Path("."),
-    base_url: Annotated[
+    index: Annotated[
         str,
         Parameter(
-            name="--base-url",
-            env_var="PRIMER_SCHEMES_URL",
-            help="Base URL for the primer schemes repository",
+            help=f"Path or URL to an {METADATA_FILE_NAME}",
         ),
-    ] = DEFAULT_SCHEMES_URL,
-    all: Annotated[
+    ] = DEFAULT_INDEX_URL,
+    strict: Annotated[
+        bool,
+        Parameter(
+            name="--strict",
+            help="Fail on any index mismatch or pre-existing output directory",
+        ),
+    ] = False,
+    force: Annotated[
+        bool,
+        Parameter(
+            name="--force",
+            help="Allow missing or mismatched checksums",
+        ),
+    ] = False,
+    allow_multiple: Annotated[
+        bool,
+        Parameter(
+            name="--allow-multiple",
+            help="Allow partial scheme_id and download all matches in parallel",
+        ),
+    ] = False,
+    sanitisation: Annotated[
+        SanitisationMode,
+        Parameter(
+            name="--sanitise",
+            help="Sanitisation mode for downloaded files",
+        ),
+    ] = SanitisationMode.RAW,
+    all_schemes: Annotated[
         bool,
         Parameter(
             name="--all",
-            help="Download all files including README.md and primer.svg",
+            help="Download all schemes in the index",
         ),
     ] = False,
 ):
     """Download a primer scheme by identifier"""
-    output_dir = get_scheme(
-        scheme_id=scheme, output=output, base_url=base_url, all_files=all
+    psi = load_index(index)
+    schemes = resolve_schemes(
+        index=psi,
+        scheme_id=scheme_id,
+        allow_multiple=allow_multiple,
+        all_schemes=all_schemes,
     )
-    logger.info(f"Scheme files written to {output_dir}")
+    output_dirs = download_schemes(
+        schemes=schemes,
+        output=output,
+        strict=strict,
+        force=force,
+        sanitisation=sanitisation,
+    )
+    if len(output_dirs) == 1:
+        logger.info(f"Scheme files written to {output_dirs[0]}")
+    else:
+        logger.info(f"Scheme files written to {len(output_dirs)} directories")
 
 
 def main():
