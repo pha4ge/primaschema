@@ -219,6 +219,8 @@ def validate_hashes(
             f"primer.bed sha256 mismatch for {scheme_subpath}. Attempting to normalise and recheck."
         )
         reformatted_sha = None
+        header = None
+        bedlines = None
         try:
             header, bedlines = BedLineParser.from_file(primer_path)
             bedlines = sort_bedlines(bedlines)
@@ -285,7 +287,7 @@ def validate_hashes(
                 )
         else:
             raise ValueError(
-                f"{REFERENCE_FILE_NAME} sha256 ({reference_sha} != info sha256 ({primer_scheme.checksums.reference_sha256}): {scheme_subpath}"
+                f"{REFERENCE_FILE_NAME} sha256 ({reference_sha}) != info sha256 ({primer_scheme.checksums.reference_sha256}): {scheme_subpath}"
             )
 
 

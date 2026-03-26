@@ -185,7 +185,7 @@ class PrimerSchemeIndex(ConfiguredBaseModel):
             original = amplicon_size_level[index.version]
 
             if original.checksums != index.checksums:
-                ValueError(
+                raise ValueError(
                     f"checksums have changed for {index.relative_path}. Use Strict == False to allow."
                 )
 
