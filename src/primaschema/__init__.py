@@ -1,7 +1,7 @@
 """Infrastructure for tiled amplicon PCR primer scheme definitions"""
 
 import logging
-import os
+from importlib.resources import files as _pkg_files
 from pathlib import Path
 
 METADATA_FILE_NAME: str = "info.json"
@@ -20,12 +20,8 @@ DEFAULT_INDEX_URL = (
 SCHEME_FILES = [METADATA_FILE_NAME, PRIMER_FILE_NAME, REFERENCE_FILE_NAME]
 SCHEME_FILES_EXTRA = ["README.md", "work/primer.svg"]
 
-PKG_DIR = Path(
-    os.environ.get(
-        "PRIMASCHEMA_ROOT_PATH", Path(__file__).absolute().parent.parent.parent
-    )
-)
-SCHEMA_DIR = PKG_DIR / "src" / "primaschema" / "schema"
+# Locate schema files via importlib.resources — works for both editable and installed packages.
+SCHEMA_DIR = Path(str(_pkg_files("primaschema").joinpath("schema")))
 INDEX_SCHEMA_PATH = SCHEMA_DIR / INDEX_FILE_NAME
 INDEX_HEADER_PATH = SCHEMA_DIR / "index-header.yml"
 

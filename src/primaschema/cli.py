@@ -3,7 +3,6 @@ import json
 import logging
 import pathlib
 import shutil
-import sys
 import tempfile
 from typing import Annotated, Any, List, Optional
 
@@ -22,12 +21,12 @@ from primaschema import (
     REFERENCE_FILE_NAME,
 )
 from primaschema.get_scheme import (
+    DEFAULT_HTTP_TIMEOUT_SECONDS,
     SanitisationMode,
     download_schemes,
     load_index,
     resolve_schemes,
 )
-from primaschema.get_scheme import DEFAULT_HTTP_TIMEOUT_SECONDS
 from primaschema.lib import plot_primers
 from primaschema.schema.index import (
     PrimerSchemeIndex,
@@ -226,7 +225,7 @@ def generate_readme(path: pathlib.Path, primer_scheme: PrimerScheme):
     :type pngs: list[pathlib.Path]
     """
 
-    with open(path / "README.md", "w") as readme:
+    with open(path / "README.md", "w", encoding="utf-8") as readme:
         readme.write(
             f"# {primer_scheme.name} {primer_scheme.amplicon_size}bp {primer_scheme.version}\n\n"
         )
@@ -547,11 +546,10 @@ def remove_contributor(
     scheme_label = f"{ps.name}/{ps.amplicon_size}/{ps.version}"
     logger.debug(f"Loaded scheme {scheme_label} from {info_path}")
     if idx >= len(ps.contributors):
-        logger.error(
+        raise ValueError(
             f"Index {idx} out of range for contributors in {info_path}. "
             f"Valid range is 0..{len(ps.contributors) - 1}."
         )
-        sys.exit(1)
     removed = ps.contributors[idx]
     logger.debug(f"Removing contributor at idx={idx}: {removed}")
     ps.contributors.pop(idx)
@@ -578,11 +576,10 @@ def update_contributor(
     scheme_label = f"{ps.name}/{ps.amplicon_size}/{ps.version}"
     logger.debug(f"Loaded scheme {scheme_label} from {info_path}")
     if idx >= len(ps.contributors):
-        logger.error(
+        raise ValueError(
             f"Index {idx} out of range for contributors in {info_path}. "
             f"Valid range is 0..{len(ps.contributors) - 1}."
         )
-        sys.exit(1)
     previous = ps.contributors[idx]
     logger.debug(f"Updating contributor at idx={idx}: {previous} -> {contributor}")
     ps.contributors[idx] = contributor
@@ -639,11 +636,10 @@ def remove_vendor(
     logger.debug(f"Loaded scheme {scheme_label} from {info_path}")
     if not ps.vendors or idx >= len(ps.vendors):
         max_idx = len(ps.vendors) - 1 if ps.vendors else -1
-        logger.error(
+        raise ValueError(
             f"Index {idx} out of range for vendors in {info_path}. "
             f"Valid range is 0..{max_idx}."
         )
-        sys.exit(1)
     removed = ps.vendors[idx]
     logger.debug(f"Removing vendor at idx={idx}: {removed}")
     ps.vendors.pop(idx)
@@ -669,11 +665,10 @@ def update_vendor(
     logger.debug(f"Loaded scheme {scheme_label} from {info_path}")
     if not ps.vendors or idx >= len(ps.vendors):
         max_idx = len(ps.vendors) - 1 if ps.vendors else -1
-        logger.error(
+        raise ValueError(
             f"Index {idx} out of range for vendors in {info_path}. "
             f"Valid range is 0..{max_idx}."
         )
-        sys.exit(1)
     previous = ps.vendors[idx]
     logger.debug(f"Updating vendor at idx={idx}: {previous} -> {vendor}")
     ps.vendors[idx] = vendor
@@ -777,11 +772,10 @@ def remove_target_organism(
     scheme_label = f"{ps.name}/{ps.amplicon_size}/{ps.version}"
     logger.debug(f"Loaded scheme {scheme_label} from {info_path}")
     if idx >= len(ps.target_organisms):
-        logger.error(
+        raise ValueError(
             f"Index {idx} out of range for target_organisms in {info_path}. "
             f"Valid range is 0..{len(ps.target_organisms) - 1}."
         )
-        sys.exit(1)
     removed = ps.target_organisms[idx]
     logger.debug(f"Removing target_organism at idx={idx}: {removed}")
     ps.target_organisms.pop(idx)
