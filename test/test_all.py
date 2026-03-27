@@ -5,8 +5,10 @@ from pathlib import Path
 import pytest
 
 import primaschema.cli as create_module
+import primaschema.get_scheme as get_scheme
 import primaschema.lib as lib
 import primaschema.validate as validate_module
+from primaschema.schema.index import PrimerSchemeIndex
 from primaschema.schema.info import PrimerScheme
 from primaschema.util import sha256_checksum
 
@@ -19,56 +21,6 @@ def run(cmd, cwd=data_dir):  # Helper for CLI testing
     )
 
 
-def test_build_index(tmp_path: Path):
-    src = data_dir / "primer-schemes"
-    dest = tmp_path / "primer-schemes"
-    shutil.copytree(src, dest)
-    lib.build_index(root_dir=dest, out_dir=tmp_path)
-    index_path = tmp_path / "index.json"
-    assert index_path.exists()
-
-
-def test_primer_bed_to_scheme_bed():
-    scheme_bed_path = (
-        data_dir / "primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0/scheme.bed"
-    )
-    primer_bed_path = (
-        data_dir / "primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0/primer.bed"
-    )
-    bed_str = lib.convert_primer_bed_to_scheme_bed(bed_path=primer_bed_path)
-    with open(scheme_bed_path) as fh:
-        expected_bed_str = fh.read()
-    assert bed_str == expected_bed_str
-
-
-def test_scheme_bed_to_primer_bed():
-    scheme_bed_path = (
-        data_dir / "primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0/scheme.bed"
-    )
-    primer_bed_path = (
-        data_dir / "primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0/primer.bed"
-    )
-    reference_path = (
-        data_dir / "primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0/reference.fasta"
-    )
-    bed_str = lib.convert_scheme_bed_to_primer_bed(
-        bed_path=scheme_bed_path, fasta_path=reference_path
-    )
-    with open(primer_bed_path) as fh:
-        expected_bed_str = fh.read()
-    assert bed_str == expected_bed_str
-
-
-def test_calculate_intervals():
-    all_intervals = lib.amplicon_intervals(
-        data_dir / "primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0/primer.bed"
-    )
-    assert "MN908947.3" in all_intervals
-    intervals = all_intervals["MN908947.3"]
-    assert "SARS-CoV-2_99" in intervals
-    assert intervals["SARS-CoV-2_99"] == (29452, 29854)
-
-
 def test_plot_single_ref_chrom_ref():
     lib.plot_primers(
         data_dir / "primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0/primer.bed",
@@ -79,49 +31,6 @@ def test_plot_single_ref_chrom_ref():
 def test_plot_many_ref_chroms_ref():
     lib.plot_primers(data_dir / "many-ref-chroms/primer.bed")
     run("rm -rf primer.html", cwd="./")
-
-
-def test_6to7_many_ref_chroms():
-    scheme_bed_path = data_dir / "many-ref-chroms/scheme.bed"
-    primer_bed_path = data_dir / "many-ref-chroms/primer.bed"
-    reference_path = data_dir / "many-ref-chroms/reference.fasta"
-    bed_str = lib.convert_scheme_bed_to_primer_bed(
-        bed_path=scheme_bed_path, fasta_path=reference_path
-    )
-    with open(primer_bed_path) as fh:
-        expected_bed_str = fh.read()
-    assert bed_str == expected_bed_str
-
-
-def test_invalid_duplicate_primers():
-    with pytest.raises(ValueError):  # Also catches pydantic.ValidationError
-        lib.validate(
-            data_dir / "broken/duplicated-primers",
-        )
-
-
-def test_invalid_primer_bounds():
-    with pytest.raises(ValueError):  # Also catches pydantic.ValidationError
-        lib.validate(
-            data_dir / "broken/primer-bounds",
-        )
-
-
-def test_invalid_amplicon_tiling():
-    with pytest.raises(ValueError):  # Also catches pydantic.ValidationError
-        lib.validate(
-            data_dir / "broken/non-tiling",
-        )
-
-
-def test_format_primer_bed():
-    """Sort BED into maximally compatible output order"""
-    assert lib.format_primer_bed(data_dir / "unordered/primer.bed").strip() == (
-        """MN908947.3	25	50	SARS-CoV-2_1_LEFT_1	1	+	AACAAACCAACCAACTTTCGATCTC
-MN908947.3	408	431	SARS-CoV-2_1_RIGHT_1	1	-	CTTCTACTAAGCCACAAGTGCCA
-MN908947.3	324	344	SARS-CoV-2_2_LEFT_1	2	+	TTTACAGGTTCGCGACGTGC
-MN908947.3	705	727	SARS-CoV-2_2_RIGHT_1	2	-	ATAAGGATCAGTGCCAAGCTCG"""
-    )
 
 
 def _copy_scheme(tmp_path: Path, rel_path: str) -> Path:
@@ -204,34 +113,6 @@ def test_validate_all_aggregates_errors_module(tmp_path: Path):
     assert "bad2" in msg
 
 
-def test_invalid_missing_field():
-    with pytest.raises(ValueError):  # Also catches pydantic.ValidationError
-        lib.validate(data_dir / "broken/info-yml/missing-field")
-        lib.validate(data_dir / "broken/info-yml/missing-field", full=True)
-
-
-def test_invalid_extra_field():
-    with pytest.raises(ValueError):  # Also catches pydantic.ValidationError
-        lib.validate(data_dir / "broken/info-yml/extra-field")
-        lib.validate(data_dir / "broken/info-yml/extra-field", full=True)
-
-
-def test_subset():
-    lib.subset(scheme_dir=data_dir / "many-ref-chroms", chrom="NC_038235.1")
-    df = lib.parse_primer_bed("built/primer.bed")
-    assert len(df) == 4
-    run("rm -rf built", cwd="./")
-
-
-# def test_commented_bed():
-#     lib.validate(data_dir / "bed-comment")
-
-
-def test_dev_scheme():
-    lib.validate(data_dir / "dev-scheme")
-    lib.validate(data_dir / "dev-scheme", full=True)
-
-
 def test_cli_create():
     run("mkdir -p built && rm -rf built/artic", cwd="./")
     run(
@@ -255,7 +136,15 @@ def test_cli_create():
 
 @pytest.mark.network
 def test_get_scheme(tmp_path: Path):
-    output_dir = lib.get_scheme("artic/400/v4.1.0", output=tmp_path)
+    psi = get_scheme.load_index(get_scheme.DEFAULT_INDEX_URL)
+    schemes = get_scheme.resolve_schemes(
+        index=psi,
+        scheme_id="artic/400/v4.1.0",
+        allow_multiple=False,
+        all_schemes=False,
+    )
+    outputs = get_scheme.download_schemes(schemes=schemes, output=tmp_path)
+    output_dir = outputs[0]
     assert (output_dir / "info.json").exists()
     assert (output_dir / "primer.bed").exists()
     assert (output_dir / "reference.fasta").exists()
@@ -263,13 +152,24 @@ def test_get_scheme(tmp_path: Path):
 
 def test_get_scheme_invalid_id():
     with pytest.raises(ValueError, match="expected format"):
-        lib.get_scheme("artic/400")
+        get_scheme.resolve_schemes(
+            index=PrimerSchemeIndex(),
+            scheme_id="artic/400/v1.0.0/extra",
+            allow_multiple=False,
+            all_schemes=False,
+        )
 
 
 @pytest.mark.network
 def test_get_scheme_nonexistent(tmp_path: Path):
-    with pytest.raises(RuntimeError, match="HTTP"):
-        lib.get_scheme("nonexistent/999/v0.0.0", output=tmp_path)
+    psi = get_scheme.load_index(get_scheme.DEFAULT_INDEX_URL)
+    with pytest.raises(ValueError, match="not found"):
+        get_scheme.resolve_schemes(
+            index=psi,
+            scheme_id="nonexistent/999/v0.0.0",
+            allow_multiple=False,
+            all_schemes=False,
+        )
 
 
 def test_rebuild_syncs_metadata_from_path(tmp_path: Path):

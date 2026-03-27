@@ -1,8 +1,8 @@
+import gzip
 import json
 import logging
 import pathlib
 import shutil
-import sys
 import tempfile
 from typing import Annotated, Any, List, Optional
 
@@ -14,12 +14,24 @@ from rich.console import Console
 from rich.traceback import install as install_rich_traceback
 
 from primaschema import (
-    DEFAULT_SCHEMES_URL,
+    DEFAULT_INDEX_URL,
+    INDEX_FILE_NAME,
     METADATA_FILE_NAME,
     PRIMER_FILE_NAME,
     REFERENCE_FILE_NAME,
 )
-from primaschema.lib import get_scheme, plot_primers
+from primaschema.get_scheme import (
+    DEFAULT_HTTP_TIMEOUT_SECONDS,
+    SanitisationMode,
+    download_schemes,
+    load_index,
+    resolve_schemes,
+)
+from primaschema.lib import plot_primers
+from primaschema.schema.index import (
+    PrimerSchemeIndex,
+    update_index,
+)
 from primaschema.schema.info import (
     Algorithm,
     Checksums,
@@ -34,14 +46,11 @@ from primaschema.schema.info import (
 from primaschema.schema.info import (
     version as SCHEMA_VERSION,
 )
-from primaschema.schema.index import (
-    PrimerSchemeIndex,
-    update_index,
-)
 from primaschema.setup_logging import LogLevel, configure_logging
 from primaschema.util import (
     find_all_info_json,
     read_fasta_records,
+    serialize_primer_scheme_json,
     sha256_checksum,
     write_fasta_records,
 )
@@ -174,12 +183,8 @@ def _save_and_rebuild_readme(
     """Saves the PrimerScheme to info.json and rebuilds the README."""
     # Save info.json
     logger.debug(f"Writing info.json to {info_path}")
-    with open(info_path, "w") as f:
-        f.write(
-            primer_scheme.model_dump_json(
-                exclude_unset=True, exclude_none=True, indent=4
-            )
-        )
+    info_bytes = serialize_primer_scheme_json(primer_scheme)
+    info_path.write_bytes(info_bytes)
 
     # Regenerate README
     scheme_dir = info_path.parent
@@ -220,7 +225,7 @@ def generate_readme(path: pathlib.Path, primer_scheme: PrimerScheme):
     :type pngs: list[pathlib.Path]
     """
 
-    with open(path / "README.md", "w") as readme:
+    with open(path / "README.md", "w", encoding="utf-8") as readme:
         readme.write(
             f"# {primer_scheme.name} {primer_scheme.amplicon_size}bp {primer_scheme.version}\n\n"
         )
@@ -287,9 +292,8 @@ def generate_readme(path: pathlib.Path, primer_scheme: PrimerScheme):
         readme.write("## Details\n\n")
 
         # Write the details into the readme
-        readme.write(
-            f"""```json\n{primer_scheme.model_dump_json(indent=4, exclude_unset=True, exclude_none=True)}\n```\n\n"""
-        )
+        details_json = serialize_primer_scheme_json(primer_scheme).decode("utf-8")
+        readme.write(f"""```json\n{details_json}\n```\n\n""")
 
         if primer_scheme.license == SchemeLicense.CC_BY_SA_4FULL_STOP0:
             readme.write(LICENSE_TXT_CC_BY_SA_4_0)
@@ -517,11 +521,11 @@ def add_contributor(
     logger.debug(f"Loaded scheme {scheme_label} from {info_path}")
     if idx is not None:
         logger.debug(f"Inserting contributor at idx={idx}: {contributor}")
-        ps.contributors.insert(idx, contributor)
+        ps.contributors = [*ps.contributors[:idx], contributor, *ps.contributors[idx:]]
         actual_idx = idx
     else:
         logger.debug(f"Appending contributor: {contributor}")
-        ps.contributors.append(contributor)
+        ps.contributors = [*ps.contributors, contributor]
         actual_idx = len(ps.contributors) - 1
     _save_and_rebuild_readme(info_path, ps)
     logger.info(
@@ -542,14 +546,13 @@ def remove_contributor(
     scheme_label = f"{ps.name}/{ps.amplicon_size}/{ps.version}"
     logger.debug(f"Loaded scheme {scheme_label} from {info_path}")
     if idx >= len(ps.contributors):
-        logger.error(
+        raise ValueError(
             f"Index {idx} out of range for contributors in {info_path}. "
             f"Valid range is 0..{len(ps.contributors) - 1}."
         )
-        sys.exit(1)
     removed = ps.contributors[idx]
     logger.debug(f"Removing contributor at idx={idx}: {removed}")
-    ps.contributors.pop(idx)
+    ps.contributors = [c for i, c in enumerate(ps.contributors) if i != idx]
     _save_and_rebuild_readme(info_path, ps)
     logger.info(
         f"Updated contributors for {scheme_label}: removed {removed} at idx {idx}"
@@ -573,11 +576,10 @@ def update_contributor(
     scheme_label = f"{ps.name}/{ps.amplicon_size}/{ps.version}"
     logger.debug(f"Loaded scheme {scheme_label} from {info_path}")
     if idx >= len(ps.contributors):
-        logger.error(
+        raise ValueError(
             f"Index {idx} out of range for contributors in {info_path}. "
             f"Valid range is 0..{len(ps.contributors) - 1}."
         )
-        sys.exit(1)
     previous = ps.contributors[idx]
     logger.debug(f"Updating contributor at idx={idx}: {previous} -> {contributor}")
     ps.contributors[idx] = contributor
@@ -604,15 +606,14 @@ def add_vendor(
     scheme_label = f"{ps.name}/{ps.amplicon_size}/{ps.version}"
     logger.debug(f"Loaded scheme {scheme_label} from {info_path}")
     if ps.vendors is None:
-        logger.debug("Initializing vendors list")
         ps.vendors = []
     if idx is not None:
         logger.debug(f"Inserting vendor at idx={idx}: {vendor}")
-        ps.vendors.insert(idx, vendor)
+        ps.vendors = [*ps.vendors[:idx], vendor, *ps.vendors[idx:]]
         actual_idx = idx
     else:
         logger.debug(f"Appending vendor: {vendor}")
-        ps.vendors.append(vendor)
+        ps.vendors = [*ps.vendors, vendor]
         actual_idx = len(ps.vendors) - 1
     _save_and_rebuild_readme(info_path, ps)
     logger.info(
@@ -634,11 +635,10 @@ def remove_vendor(
     logger.debug(f"Loaded scheme {scheme_label} from {info_path}")
     if not ps.vendors or idx >= len(ps.vendors):
         max_idx = len(ps.vendors) - 1 if ps.vendors else -1
-        logger.error(
+        raise ValueError(
             f"Index {idx} out of range for vendors in {info_path}. "
             f"Valid range is 0..{max_idx}."
         )
-        sys.exit(1)
     removed = ps.vendors[idx]
     logger.debug(f"Removing vendor at idx={idx}: {removed}")
     ps.vendors.pop(idx)
@@ -664,11 +664,10 @@ def update_vendor(
     logger.debug(f"Loaded scheme {scheme_label} from {info_path}")
     if not ps.vendors or idx >= len(ps.vendors):
         max_idx = len(ps.vendors) - 1 if ps.vendors else -1
-        logger.error(
+        raise ValueError(
             f"Index {idx} out of range for vendors in {info_path}. "
             f"Valid range is 0..{max_idx}."
         )
-        sys.exit(1)
     previous = ps.vendors[idx]
     logger.debug(f"Updating vendor at idx={idx}: {previous} -> {vendor}")
     ps.vendors[idx] = vendor
@@ -688,12 +687,9 @@ def add_tag(
     ps = PrimerScheme.model_validate_json(info_path.read_text())
     scheme_label = f"{ps.name}/{ps.amplicon_size}/{ps.version}"
     logger.debug(f"Loaded scheme {scheme_label} from {info_path}")
-    if ps.tags is None:
-        logger.debug("Initializing tags list")
-        ps.tags = []
     if tag not in ps.tags:
         logger.debug(f"Adding tag: {tag}")
-        ps.tags.append(tag)
+        ps.tags = [*ps.tags, tag]
         _save_and_rebuild_readme(info_path, ps)
         logger.info(f"Updated tags for {scheme_label}: added {tag}")
         return
@@ -714,7 +710,7 @@ def remove_tag(
     logger.debug(f"Loaded scheme {scheme_label} from {info_path}")
     if ps.tags and tag in ps.tags:
         logger.debug(f"Removing tag: {tag}")
-        ps.tags.remove(tag)
+        ps.tags = [t for t in ps.tags if t != tag]
         _save_and_rebuild_readme(info_path, ps)
         logger.info(f"Updated tags for {scheme_label}: removed {tag}")
         return
@@ -772,14 +768,13 @@ def remove_target_organism(
     scheme_label = f"{ps.name}/{ps.amplicon_size}/{ps.version}"
     logger.debug(f"Loaded scheme {scheme_label} from {info_path}")
     if idx >= len(ps.target_organisms):
-        logger.error(
+        raise ValueError(
             f"Index {idx} out of range for target_organisms in {info_path}. "
             f"Valid range is 0..{len(ps.target_organisms) - 1}."
         )
-        sys.exit(1)
     removed = ps.target_organisms[idx]
     logger.debug(f"Removing target_organism at idx={idx}: {removed}")
-    ps.target_organisms.pop(idx)
+    ps.target_organisms = [to for i, to in enumerate(ps.target_organisms) if i != idx]
     _save_and_rebuild_readme(info_path, ps)
     logger.info(
         f"Updated target_organisms for {scheme_label}: removed {removed} at idx {idx}"
@@ -808,7 +803,11 @@ def add_target_organism(
         idx = len(ps.target_organisms)
 
     logger.debug(f"Adding target_organism at idx={idx}: {target_organism}")
-    ps.target_organisms.insert(idx, target_organism)
+    ps.target_organisms = [
+        *ps.target_organisms[:idx],
+        target_organism,
+        *ps.target_organisms[idx:],
+    ]
     _save_and_rebuild_readme(info_path, ps)
     logger.info(
         f"Updated target_organisms for {scheme_label}: added {target_organism} at idx {idx}"
@@ -846,7 +845,19 @@ def index(
         ),
     ],
     index_path: Optional[pathlib.Path] = None,
-    base_url: str = "",
+    base_url: Annotated[
+        str,
+        Parameter(
+            help="The URL source at which the primer schemes can be found. i.e `https://github.com/pha4ge/primer-schemes/main/v1b/schemes`",
+        ),
+    ] = "",
+    output_path: Annotated[
+        pathlib.Path,
+        Parameter(
+            validator=validators.Path(exists=True, dir_okay=True, file_okay=False),
+            help=f"The directory to write the {INDEX_FILE_NAME} and {INDEX_FILE_NAME}.gz",
+        ),
+    ] = pathlib.Path("."),
 ):
     """Build a JSON index of all primer schemes in a directory"""
     # Read in current index
@@ -855,18 +866,29 @@ def index(
     else:
         psi = PrimerSchemeIndex()
 
+    # Sanitise the base_url
+    base_url = base_url.strip("/")
+
     # find all primer schemes
     ps = []
     for ps_info in find_all_info_json(primer_schemes_path):
         logger.debug(f"found {ps_info}")
         ps.append(PrimerScheme.model_validate_json(ps_info.read_text()))
-
     update_index(ps, psi, base_url=base_url)
 
     # Ensure schemes is marked as set for exclude_unset=True
     psi.primerschemes = psi.primerschemes
 
-    print(psi.model_dump_json(exclude_unset=True, exclude_none=True))
+    index_str = psi.model_dump_json(
+        exclude_unset=True, exclude_none=True, ensure_ascii=True
+    )
+
+    # Write out the text and compressed index
+    (output_path / INDEX_FILE_NAME).write_text(index_str)
+    (output_path / (INDEX_FILE_NAME + ".gz")).write_bytes(
+        gzip.compress(index_str.encode("utf-8"))
+    )
+    logger.debug(f"wrote {INDEX_FILE_NAME} to `{output_path}`")
 
 
 # Validate commands
@@ -1034,35 +1056,85 @@ def rebuild(
 
 @app.command
 def get(
-    scheme: Annotated[
-        str,
-        Parameter(help="Scheme identifier, e.g. artic/400/5.4.2"),
-    ],
+    scheme_id: Annotated[
+        Optional[str],
+        Parameter(
+            help="Scheme identifier, e.g. artic/400/v5.4.2 (required unless --all)"
+        ),
+    ] = None,
     output: Annotated[
         pathlib.Path,
         Parameter(name=["--output", "-o"], help="Output directory"),
     ] = pathlib.Path("."),
-    base_url: Annotated[
+    index: Annotated[
         str,
         Parameter(
-            name="--base-url",
-            env_var="PRIMER_SCHEMES_URL",
-            help="Base URL for the primer schemes repository",
+            help=f"Path or URL to an {METADATA_FILE_NAME}",
         ),
-    ] = DEFAULT_SCHEMES_URL,
-    all: Annotated[
+    ] = DEFAULT_INDEX_URL,
+    strict: Annotated[
+        bool,
+        Parameter(
+            name="--strict",
+            help="Fail on any index mismatch or pre-existing output directory",
+        ),
+    ] = False,
+    force: Annotated[
+        bool,
+        Parameter(
+            name="--force",
+            help="Allow missing or mismatched checksums",
+        ),
+    ] = False,
+    allow_multiple: Annotated[
+        bool,
+        Parameter(
+            name="--allow-multiple",
+            help="Allow partial scheme_id and download all matches in parallel",
+        ),
+    ] = False,
+    sanitisation: Annotated[
+        SanitisationMode,
+        Parameter(
+            name="--sanitise",
+            help="Sanitisation mode for downloaded files",
+        ),
+    ] = SanitisationMode.RAW,
+    timeout: Annotated[
+        float,
+        Parameter(
+            name="--timeout",
+            help="HTTP timeout in seconds",
+        ),
+    ] = DEFAULT_HTTP_TIMEOUT_SECONDS,
+    all_schemes: Annotated[
         bool,
         Parameter(
             name="--all",
-            help="Download all files including README.md and primer.svg",
+            help="Download all schemes in the index",
         ),
     ] = False,
 ):
     """Download a primer scheme by identifier"""
-    output_dir = get_scheme(
-        scheme_id=scheme, output=output, base_url=base_url, all_files=all
+    psi = load_index(index, timeout=timeout)
+    schemes = resolve_schemes(
+        index=psi,
+        scheme_id=scheme_id,
+        allow_multiple=allow_multiple,
+        all_schemes=all_schemes,
     )
-    logger.info(f"Scheme files written to {output_dir}")
+    output_dirs = download_schemes(
+        schemes=schemes,
+        output=output,
+        strict=strict,
+        force=force,
+        sanitisation=sanitisation,
+        timeout=timeout,
+    )
+    if len(output_dirs) == 1:
+        logger.info(f"Scheme files written to {output_dirs[0]}")
+    else:
+        logger.info(f"Scheme files written to {len(output_dirs)} directories")
 
 
 def main():
