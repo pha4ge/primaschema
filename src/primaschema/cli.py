@@ -521,11 +521,11 @@ def add_contributor(
     logger.debug(f"Loaded scheme {scheme_label} from {info_path}")
     if idx is not None:
         logger.debug(f"Inserting contributor at idx={idx}: {contributor}")
-        ps.contributors.insert(idx, contributor)
+        ps.contributors = [*ps.contributors[:idx], contributor, *ps.contributors[idx:]]
         actual_idx = idx
     else:
         logger.debug(f"Appending contributor: {contributor}")
-        ps.contributors.append(contributor)
+        ps.contributors = [*ps.contributors, contributor]
         actual_idx = len(ps.contributors) - 1
     _save_and_rebuild_readme(info_path, ps)
     logger.info(
@@ -552,7 +552,7 @@ def remove_contributor(
         )
     removed = ps.contributors[idx]
     logger.debug(f"Removing contributor at idx={idx}: {removed}")
-    ps.contributors.pop(idx)
+    ps.contributors = [c for i, c in enumerate(ps.contributors) if i != idx]
     _save_and_rebuild_readme(info_path, ps)
     logger.info(
         f"Updated contributors for {scheme_label}: removed {removed} at idx {idx}"
@@ -606,15 +606,14 @@ def add_vendor(
     scheme_label = f"{ps.name}/{ps.amplicon_size}/{ps.version}"
     logger.debug(f"Loaded scheme {scheme_label} from {info_path}")
     if ps.vendors is None:
-        logger.debug("Initializing vendors list")
         ps.vendors = []
     if idx is not None:
         logger.debug(f"Inserting vendor at idx={idx}: {vendor}")
-        ps.vendors.insert(idx, vendor)
+        ps.vendors = [*ps.vendors[:idx], vendor, *ps.vendors[idx:]]
         actual_idx = idx
     else:
         logger.debug(f"Appending vendor: {vendor}")
-        ps.vendors.append(vendor)
+        ps.vendors = [*ps.vendors, vendor]
         actual_idx = len(ps.vendors) - 1
     _save_and_rebuild_readme(info_path, ps)
     logger.info(
@@ -688,12 +687,9 @@ def add_tag(
     ps = PrimerScheme.model_validate_json(info_path.read_text())
     scheme_label = f"{ps.name}/{ps.amplicon_size}/{ps.version}"
     logger.debug(f"Loaded scheme {scheme_label} from {info_path}")
-    if ps.tags is None:
-        logger.debug("Initializing tags list")
-        ps.tags = []
     if tag not in ps.tags:
         logger.debug(f"Adding tag: {tag}")
-        ps.tags.append(tag)
+        ps.tags = [*ps.tags, tag]
         _save_and_rebuild_readme(info_path, ps)
         logger.info(f"Updated tags for {scheme_label}: added {tag}")
         return
@@ -714,7 +710,7 @@ def remove_tag(
     logger.debug(f"Loaded scheme {scheme_label} from {info_path}")
     if ps.tags and tag in ps.tags:
         logger.debug(f"Removing tag: {tag}")
-        ps.tags.remove(tag)
+        ps.tags = [t for t in ps.tags if t != tag]
         _save_and_rebuild_readme(info_path, ps)
         logger.info(f"Updated tags for {scheme_label}: removed {tag}")
         return
@@ -778,7 +774,7 @@ def remove_target_organism(
         )
     removed = ps.target_organisms[idx]
     logger.debug(f"Removing target_organism at idx={idx}: {removed}")
-    ps.target_organisms.pop(idx)
+    ps.target_organisms = [to for i, to in enumerate(ps.target_organisms) if i != idx]
     _save_and_rebuild_readme(info_path, ps)
     logger.info(
         f"Updated target_organisms for {scheme_label}: removed {removed} at idx {idx}"
@@ -807,7 +803,11 @@ def add_target_organism(
         idx = len(ps.target_organisms)
 
     logger.debug(f"Adding target_organism at idx={idx}: {target_organism}")
-    ps.target_organisms.insert(idx, target_organism)
+    ps.target_organisms = [
+        *ps.target_organisms[:idx],
+        target_organism,
+        *ps.target_organisms[idx:],
+    ]
     _save_and_rebuild_readme(info_path, ps)
     logger.info(
         f"Updated target_organisms for {scheme_label}: added {target_organism} at idx {idx}"
