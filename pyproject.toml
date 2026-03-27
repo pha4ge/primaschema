@@ -54,6 +54,7 @@ dev = [
     "ruff>=0.14.6",
 ]
 docs = [
+    "griffe-pydantic>=1.1.0",
     "cyclopts[mkdocs]>=4.10.0",
         "mkdocstrings-python>=1.16.10",
         "mkdocs>=1.6.1,<2",

@@ -12,6 +12,13 @@ plugins:
         python:
           options:
             docstring_style: google
+            show_root_heading: true
+            show_root_full_path: false
+            extensions:
+              - griffe_pydantic
+              # - docs/griffe_ext.py:InjectValidatorDocs
+          inventories:
+            - https://docs.pydantic.dev/latest/objects.inv
   - cyclopts
 
 markdown_extensions:
@@ -22,3 +29,5 @@ markdown_extensions:
 nav:
   - Command Line Interface: cli.md
   - API: api.md
+  - Info Model: info_model.md
+  - Index Model: index_model.md
