@@ -10,7 +10,7 @@ primaschema create \
     --name example-scheme \
     --amplicon-size 400 \
     --version v1.0.0 \
-    --status validated \
+    --status VALIDATED \
     --contributors "name=Alice Smith,email=alice@example.org" \
     --target-organisms "common_name=Example organism,ncbi_tax_id=000001" \
     --bed-path ./example-scheme.primer.bed \
@@ -221,7 +221,7 @@ primaschema modify update-vendor \
 ```bash
 primaschema modify add-tag \
     ./schemes/example-scheme/400/v1.0.0/info.json \
-    clinical
+    CLINICAL
 ```
 
 ---
@@ -231,7 +231,7 @@ primaschema modify add-tag \
 ```bash
 primaschema modify remove-tag \
     ./schemes/example-scheme/400/v1.0.0/info.json \
-    clinical
+    CLINICAL
 ```
 
 ---
@@ -241,7 +241,7 @@ primaschema modify remove-tag \
 ```bash
 primaschema modify update-license \
     ./schemes/example-scheme/400/v1.0.0/info.json \
-    cc-by-sa-4-full-stop0
+    CC-BY-SA-4.0
 ```
 
 ---
@@ -251,7 +251,7 @@ primaschema modify update-license \
 ```bash
 primaschema modify update-status \
     ./schemes/example-scheme/400/v1.0.0/info.json \
-    validated
+    VALIDATED
 ```
 
 ---
