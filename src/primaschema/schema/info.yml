@@ -5,6 +5,7 @@ version: 1.0.0-alpha
 prefixes:
   linkml: https://w3id.org/linkml/
   schema: http://schema.org/
+  dcterms: http://purl.org/dc/terms/
   ORCID: http://identifiers.org/orcid/
   GENEPIO: http://purl.obolibrary.org/obo/GENEPIO_
   IAO: "http://purl.obolibrary.org/obo/IAO_"
@@ -47,6 +48,8 @@ classes:
       - algorithm
       - checksums
       - ref_selections
+      - date_created
+      - date_added
 
   Vendor:
     class_uri: GENEPIO:0100674
@@ -205,6 +208,14 @@ slots:
     multivalued: true
     inlined_as_list: true
     required: false
+  date_created:
+    slot_uri: dcterms:created
+    description: "Date the primer scheme was originally created by its authors"
+    range: date
+  date_added:
+    slot_uri: dcterms:available
+    description: "Date the scheme was added to this registry"
+    range: date
 
 enums:
   SchemeStatus:
@@ -218,7 +229,13 @@ enums:
   SchemeLicense:
     description: "License under which the primer scheme is distributed"
     permissible_values:
+      CC0-1.0:
+      CC-BY-4.0:
       CC-BY-SA-4.0:
+      CC-BY-NC-4.0:
+      CC-BY-NC-SA-4.0:
+      CC-BY-ND-4.0:
+      CC-BY-NC-ND-4.0:
   SchemeTag:
     description: "Tag for this primer scheme"
     permissible_values:

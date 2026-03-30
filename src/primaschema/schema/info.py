@@ -95,7 +95,13 @@ class SchemeLicense(str, Enum):
     """
     License under which the primer scheme is distributed
     """
+    CC0_1FULL_STOP0 = "CC0-1.0"
+    CC_BY_4FULL_STOP0 = "CC-BY-4.0"
     CC_BY_SA_4FULL_STOP0 = "CC-BY-SA-4.0"
+    CC_BY_NC_4FULL_STOP0 = "CC-BY-NC-4.0"
+    CC_BY_NC_SA_4FULL_STOP0 = "CC-BY-NC-SA-4.0"
+    CC_BY_ND_4FULL_STOP0 = "CC-BY-ND-4.0"
+    CC_BY_NC_ND_4FULL_STOP0 = "CC-BY-NC-ND-4.0"
 
 
 class SchemeTag(str, Enum):
@@ -132,6 +138,8 @@ class PrimerScheme(ConfiguredBaseModel):
     algorithm: Optional[Algorithm] = Field(default=None, description="""The algorithm (if any) used to generate this primer scheme""")
     checksums: Optional[Checksums] = Field(default=None, description="""SHA256 checksums for scheme files""")
     ref_selections: Optional[list[RefSelection]] = Field(default=[], description="""Optional reference selections""")
+    date_created: Optional[date] = Field(default=None, description="""Date the primer scheme was originally created by its authors""")
+    date_added: Optional[date] = Field(default=None, description="""Date the scheme was added to this registry""")
 
     @field_validator('name')
     def pattern_name(cls, v):
