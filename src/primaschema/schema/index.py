@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Any, Generator, Optional
 
 from pydantic import BaseModel, Field, model_validator
@@ -62,6 +63,14 @@ class IndexPrimerScheme(BaseModel):
         default=None,
         description="""SHA256 checksums for scheme files""",
     )
+    date_created: Optional[date] = Field(
+        default=None,
+        description="""Date the primer scheme was originally created by its authors""",
+    )
+    date_added: Optional[date] = Field(
+        default=None,
+        description="""Date the scheme was added to this registry""",
+    )
     base_url: str = Field(default="", exclude=True)  # Only used for URL synthesis
     primer_file_url: Optional[str] = Field(
         default=None,
@@ -123,6 +132,8 @@ class IndexPrimerScheme(BaseModel):
             tags=scheme.tags,
             derived_from=scheme.derived_from,
             checksums=scheme.checksums,
+            date_created=scheme.date_created,
+            date_added=scheme.date_added,
             base_url=base_url,
         )
 
