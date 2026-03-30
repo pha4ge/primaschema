@@ -11,12 +11,16 @@ primaschema create \
     --amplicon-size 400 \
     --version v1.0.0 \
     --status VALIDATED \
-    --contributors "name=Alice Smith,email=alice@example.org" \
+    --license CC-BY-SA-4.0 \
+    --date-created 2024-01-15 \
+    --contributors "name=Alice Smith,email=alice@example.org,orcid_id=0000-0001-2345-6789" \
     --target-organisms "common_name=Example organism,ncbi_tax_id=000001" \
     --bed-path ./example-scheme.primer.bed \
     --reference-path ./example-scheme.reference.fasta \
     --primer-schemes-path ./schemes
 ```
+
+`--date-added` defaults to today if omitted. `--license` defaults to `CC-BY-SA-4.0`.
 
 The scheme is written to `./schemes/example-scheme/400/v1.0.0/`.
 
@@ -288,4 +292,24 @@ Remove the target organism at index 0:
 primaschema modify remove-target-organism \
     ./schemes/example-scheme/400/v1.0.0/info.json \
     0
+```
+
+---
+
+## modify update-date-created
+
+```bash
+primaschema modify update-date-created \
+    ./schemes/example-scheme/400/v1.0.0/info.json \
+    2024-01-15
+```
+
+---
+
+## modify update-date-added
+
+```bash
+primaschema modify update-date-added \
+    ./schemes/example-scheme/400/v1.0.0/info.json \
+    2024-06-01
 ```
