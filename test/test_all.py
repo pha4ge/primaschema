@@ -22,18 +22,21 @@ def run(cmd, cwd=data_dir):  # Helper for CLI testing
     )
 
 
-def test_plot_single_ref_chrom_ref():
+def test_plot_single_ref_chrom_ref(tmp_path: Path):
     """plot_primers completes without error for a single-chromosome scheme."""
+    out_path = tmp_path / "primer.html"
     lib.plot_primers(
         data_dir / "primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0/primer.bed",
+        out_path=out_path,
     )
-    run("rm -rf primer.html", cwd="./")
+    assert out_path.exists()
 
 
-def test_plot_many_ref_chroms_ref():
+def test_plot_many_ref_chroms_ref(tmp_path: Path):
     """plot_primers handles a scheme with multiple reference chromosomes."""
-    lib.plot_primers(data_dir / "many-ref-chroms/primer.bed")
-    run("rm -rf primer.html", cwd="./")
+    out_path = tmp_path / "primer.html"
+    lib.plot_primers(data_dir / "many-ref-chroms/primer.bed", out_path=out_path)
+    assert out_path.exists()
 
 
 def _copy_scheme(tmp_path: Path, rel_path: str) -> Path:
@@ -302,6 +305,7 @@ def test_primer_scheme_dates_accept_valid():
 def test_cli_scheme_date_created_required():
     """CLIPrimerScheme raises ValidationError when date_created is omitted."""
     from pydantic import ValidationError
+
     from primaschema.cli import CLIPrimerScheme
     from primaschema.schema.info import Contributor, SchemeStatus, TargetOrganism
 
@@ -320,6 +324,7 @@ def test_cli_scheme_date_created_required():
 def test_cli_scheme_date_added_defaults_to_today():
     """CLIPrimerScheme sets date_added to today when not explicitly provided."""
     from unittest.mock import patch
+
     from primaschema.cli import CLIPrimerScheme
     from primaschema.schema.info import Contributor, SchemeStatus, TargetOrganism
 
