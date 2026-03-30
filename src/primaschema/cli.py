@@ -4,12 +4,13 @@ import logging
 import pathlib
 import shutil
 import tempfile
-from typing import Annotated, Any, List, Optional
+from datetime import date
+from typing import Annotated, Any, List, Literal, Optional
 
 from cyclopts import App, Parameter, validators
 from primalbedtools.bedfiles import BedLineParser, sort_bedlines
 from primalbedtools.validate import validate_ref_and_bed
-from pydantic import BeforeValidator, field_validator, model_validator
+from pydantic import BeforeValidator, Field, field_validator, model_validator
 from rich.console import Console
 from rich.traceback import install as install_rich_traceback
 
@@ -54,21 +55,28 @@ from primaschema.util import (
     sha256_checksum,
     write_fasta_records,
 )
+from primaschema.license_footers import LICENSE_FOOTERS
 from primaschema.validate import validate as validate_scheme
 
 logger = logging.getLogger(__name__)
 
-
-LICENSE_TXT_CC_BY_SA_4_0 = """\n\n------------------------------------------------------------------------
-
-This work is licensed under a [Creative Commons Attribution-ShareAlike 4.0 International License](http://creativecommons.org/licenses/by-sa/4.0/)
-
-![](https://i.creativecommons.org/l/by-sa/4.0/88x31.png)"""
+# Literal type built from SchemeLicense values so Cyclopts displays proper SPDX strings
+_LicenseLiteral = Literal[
+    "CC0-1.0",
+    "CC-BY-4.0",
+    "CC-BY-SA-4.0",
+    "CC-BY-NC-4.0",
+    "CC-BY-NC-SA-4.0",
+    "CC-BY-ND-4.0",
+    "CC-BY-NC-ND-4.0",
+]
 
 # Patch PrimerScheme to fix cyclopts issue with string defaults for Enums
 # See https://github.com/pha4ge/primaschema/issues/new
-if PrimerScheme.model_fields["license"].default == "CC-BY-SA-4.0":
-    PrimerScheme.model_fields["license"].default = SchemeLicense.CC_BY_SA_4FULL_STOP0
+if isinstance(PrimerScheme.model_fields["license"].default, str):
+    PrimerScheme.model_fields["license"].default = SchemeLicense(
+        PrimerScheme.model_fields["license"].default
+    )
 
 # Add rich formatted errors
 error_console = Console(stderr=True)
@@ -295,8 +303,10 @@ def generate_readme(path: pathlib.Path, primer_scheme: PrimerScheme):
         details_json = serialize_primer_scheme_json(primer_scheme).decode("utf-8")
         readme.write(f"""```json\n{details_json}\n```\n\n""")
 
-        if primer_scheme.license == SchemeLicense.CC_BY_SA_4FULL_STOP0:
-            readme.write(LICENSE_TXT_CC_BY_SA_4_0)
+        if primer_scheme.license and (
+            footer := LICENSE_FOOTERS.get(primer_scheme.license)
+        ):
+            readme.write(footer)
 
 
 def parse_algorithm(v: Any) -> Optional[Algorithm]:
@@ -364,20 +374,56 @@ def parse_vendors_pydantic(v: Any) -> Optional[List[Vendor]]:
     return v
 
 
+def _normalize_license(v: Any) -> Any:
+    """Case-insensitive match against valid SPDX values; pass through SchemeLicense instances."""
+    if isinstance(v, SchemeLicense):
+        return v.value
+    if isinstance(v, str):
+        for member in SchemeLicense:
+            if v.lower() == member.value.lower():
+                return member.value
+    return v
+
+
 class CLIPrimerScheme(PrimerScheme):
     schema_version: Annotated[str, Parameter(parse=False)] = SCHEMA_VERSION
     contributors: Annotated[  # type: ignore
-        List[Contributor], BeforeValidator(parse_contributors_pydantic)
+        List[Contributor],
+        BeforeValidator(parse_contributors_pydantic),
+        Parameter(
+            help="Individuals, organisations, or institutions that have contributed to the development. e.g. `name=Alice Smith,email=alice@example.org,orcid_id=0000-0001-2345-6789`"
+        ),
     ]
     target_organisms: Annotated[  # type: ignore
-        List[TargetOrganism], BeforeValidator(parse_target_organisms_pydantic)
+        List[TargetOrganism],
+        BeforeValidator(parse_target_organisms_pydantic),
+        Parameter(
+            help="The organism(s) targeted by this primer scheme. e.g. `common_name=SARS-CoV-2,ncbi_tax_id=2697049`"
+        ),
     ]
     vendors: Annotated[
-        Optional[List[Vendor]], BeforeValidator(parse_vendors_pydantic)
+        Optional[List[Vendor]],
+        BeforeValidator(parse_vendors_pydantic),
+        Parameter(
+            help="Vendors where one can purchase the primers or a kit containing them. e.g. `organisation_name=IDT,kit_name=10011442,home_page=https://example.com`"
+        ),
     ] = None
     algorithm: Annotated[Optional[Algorithm], Parameter(parse=False)] = None
     # Don't expose the checksums to cli
     checksums: Annotated[Checksums | None, Parameter(parse=False)] = None
+    # Override with Literal so Cyclopts displays proper SPDX strings instead of mangled enum names
+    license: Annotated[  # type: ignore
+        Optional[_LicenseLiteral],
+        BeforeValidator(_normalize_license),
+    ] = SchemeLicense.CC_BY_SA_4FULL_STOP0.value
+    date_created: Annotated[
+        date,
+        Parameter(help="Date the primer scheme was originally created by its authors"),
+    ]
+    date_added: Annotated[
+        date,
+        Parameter(help="Date the scheme was added to this registry [default: today]"),
+    ] = Field(default_factory=date.today)
 
     @field_validator("target_organisms")
     def validate_target_organisms(cls, v):
@@ -395,10 +441,6 @@ class CLIPrimerScheme(PrimerScheme):
             # Uppercase status if it's a string
             if "status" in data and isinstance(data["status"], str):
                 data["status"] = data["status"].upper()
-
-            # Uppercase license if it's a string
-            if "license" in data and isinstance(data["license"], str):
-                data["license"] = data["license"].upper()
 
             # Uppercase tags if it's a list of strings
             if "tags" in data and isinstance(data["tags"], list):
@@ -723,7 +765,10 @@ def update_license(
         pathlib.Path,
         Parameter(validator=validators.Path(exists=True, file_okay=True)),
     ],
-    license: SchemeLicense,
+    license: Annotated[
+        _LicenseLiteral,
+        Parameter(converter=_normalize_license),
+    ],
 ):
     """Update the scheme license."""
     ps = PrimerScheme.model_validate_json(info_path.read_text())
@@ -753,6 +798,38 @@ def update_status(
     ps.status = status
     _save_and_rebuild_readme(info_path, ps)
     logger.info(f"Updated status for {scheme_label}: {previous} -> {status}")
+
+
+@modify_app.command
+def update_date_created(
+    info_path: Annotated[
+        pathlib.Path,
+        Parameter(validator=validators.Path(exists=True, file_okay=True)),
+    ],
+    date_created: date,
+):
+    """Update the date the primer scheme was originally created."""
+    ps = PrimerScheme.model_validate_json(info_path.read_text())
+    previous = ps.date_created
+    ps.date_created = date_created
+    _save_and_rebuild_readme(info_path, ps)
+    logger.info(f"Updated date_created: {previous} -> {date_created}")
+
+
+@modify_app.command
+def update_date_added(
+    info_path: Annotated[
+        pathlib.Path,
+        Parameter(validator=validators.Path(exists=True, file_okay=True)),
+    ],
+    date_added: date,
+):
+    """Update the date the scheme was added to the registry."""
+    ps = PrimerScheme.model_validate_json(info_path.read_text())
+    previous = ps.date_added
+    ps.date_added = date_added
+    _save_and_rebuild_readme(info_path, ps)
+    logger.info(f"Updated date_added: {previous} -> {date_added}")
 
 
 @modify_app.command
