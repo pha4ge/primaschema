@@ -323,26 +323,20 @@ def test_cli_scheme_date_created_required():
 
 def test_cli_scheme_date_added_defaults_to_today():
     """CLIPrimerScheme sets date_added to today when not explicitly provided."""
-    from unittest.mock import patch
-
     from primaschema.cli import CLIPrimerScheme
     from primaschema.schema.info import Contributor, SchemeStatus, TargetOrganism
 
-    fixed = date(2026, 3, 30)
-    with patch("primaschema.cli.date") as mock_date:
-        mock_date.today.return_value = fixed
-        mock_date.side_effect = lambda *a, **kw: date(*a, **kw)
-        ps = CLIPrimerScheme(
-            schema_version="1.0.0",
-            name="test",
-            amplicon_size=400,
-            version="v1.0.0",
-            status=SchemeStatus.DRAFT,
-            contributors=[Contributor(name="Alice")],
-            target_organisms=[TargetOrganism(common_name="SARS-CoV-2")],
-            date_created=date(2024, 1, 1),
-        )
-    assert ps.date_added == fixed
+    ps = CLIPrimerScheme(
+        schema_version="1.0.0",
+        name="test",
+        amplicon_size=400,
+        version="v1.0.0",
+        status=SchemeStatus.DRAFT,
+        contributors=[Contributor(name="Alice")],
+        target_organisms=[TargetOrganism(common_name="SARS-CoV-2")],
+        date_created=date(2024, 1, 1),
+    )
+    assert ps.date_added == date.today()
 
 
 # ---------------------------------------------------------------------------
