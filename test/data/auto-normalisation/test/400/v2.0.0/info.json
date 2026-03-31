@@ -6,11 +6,17 @@
   "contributors": [
     {
       "name": "Chris"
+    },
+    {
+      "name": "Chris2"
     }
   ],
   "target_organisms": [
     {
       "common_name": "SARs-CoV-2"
+    },
+    {
+      "common_name": "SARs-CoV"
     }
   ],
   "license": "CC-BY-SA-4.0",
