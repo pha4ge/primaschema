@@ -78,7 +78,7 @@ classes:
       email:
         slot_uri: IAO:0000429
         description: "Contact email"
-        pattern: "^[\\w\\-\\.]+@([\\w-]+\\.)+[\\w-]{2,}$"
+        pattern: "^[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}$"
 
   Algorithm:
     class_uri: IAO:0000064
@@ -140,6 +140,7 @@ slots:
     description: Individuals, organisations, or institutions that have contributed to the development
     required: true
     multivalued: true
+    minimum_cardinality: 1
     inlined_as_list: true
     range: Contributor
   target_organisms:
@@ -148,6 +149,7 @@ slots:
     description: The organism against which this primer scheme is targeted.
     range: TargetOrganism
     multivalued: true
+    minimum_cardinality: 1
     inlined_as_list: true
 
   aliases:

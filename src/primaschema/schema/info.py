@@ -125,8 +125,8 @@ class PrimerScheme(ConfiguredBaseModel):
     name: str = Field(default=..., description="""The canonical name of the primer scheme (lowercase)""")
     amplicon_size: int = Field(default=..., description="""The length (in base pairs) of an amplicon in the primer scheme""", ge=1)
     version: str = Field(default=..., description="""The semantic version of the scheme (v.{x}.{y}.{z})""")
-    contributors: list[Contributor] = Field(default=..., description="""Individuals, organisations, or institutions that have contributed to the development""")
-    target_organisms: list[TargetOrganism] = Field(default=..., description="""The organism against which this primer scheme is targeted.""")
+    contributors: list[Contributor] = Field(default=..., description="""Individuals, organisations, or institutions that have contributed to the development""", min_length=1)
+    target_organisms: list[TargetOrganism] = Field(default=..., description="""The organism against which this primer scheme is targeted.""", min_length=1)
     aliases: Optional[list[str]] = Field(default=[], description="""Aliases for primer scheme name""")
     license: Optional[SchemeLicense] = Field(default='CC-BY-SA-4.0', description="""License under which the primer scheme is distributed""")
     status: SchemeStatus = Field(default=..., description="""The status of this primer scheme (e.g. published, deprecated)""")
@@ -187,7 +187,7 @@ class Contributor(ConfiguredBaseModel):
 
     @field_validator('email')
     def pattern_email(cls, v):
-        pattern=re.compile(r"^[\w\-\.]+@([\w-]+\.)+[\w-]{2,}$")
+        pattern=re.compile(r"^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$")
         if isinstance(v, list):
             for element in v:
                 if isinstance(element, str) and not pattern.match(element):
