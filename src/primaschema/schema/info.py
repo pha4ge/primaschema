@@ -108,9 +108,9 @@ class SchemeTag(str, Enum):
     """
     Tag for this primer scheme
     """
-    WASTE_WATER = "WASTE-WATER"
+    WASTEWATER = "WASTEWATER"
     CLINICAL = "CLINICAL"
-    FULL_GENOME = "FULL-GENOME"
+    WHOLE_GENOME = "WHOLE-GENOME"
     MULTI_TARGET = "MULTI-TARGET"
     PANEL = "PANEL"
     QPCR = "QPCR"
