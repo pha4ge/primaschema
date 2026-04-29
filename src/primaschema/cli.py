@@ -1086,7 +1086,7 @@ def _rebuild_one(
         primer_sha256=sha256_checksum(info_path.parent / PRIMER_FILE_NAME),
         reference_sha256=sha256_checksum(info_path.parent / REFERENCE_FILE_NAME),
     )
-    _save_and_rebuild_readme(info_path, ps)
+    _save_and_rebuild_readme(info_path, ps, rebuild_plot=True)
     return scheme_label
 
 
