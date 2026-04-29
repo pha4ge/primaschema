@@ -241,9 +241,9 @@ enums:
   SchemeTag:
     description: "Tag for this primer scheme"
     permissible_values:
-      WASTE-WATER:
+      WASTEWATER:
       CLINICAL:
-      FULL-GENOME:
+      WHOLE-GENOME:
       MULTI-TARGET:
       PANEL:
       QPCR:
