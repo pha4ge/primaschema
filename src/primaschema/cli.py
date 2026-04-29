@@ -29,6 +29,7 @@ from primaschema.get_scheme import (
     resolve_schemes,
 )
 from primaschema.lib import plot_primers
+from primaschema.license_footers import LICENSE_FOOTERS
 from primaschema.schema.index import (
     PrimerSchemeIndex,
     update_index,
@@ -55,7 +56,6 @@ from primaschema.util import (
     sha256_checksum,
     write_fasta_records,
 )
-from primaschema.license_footers import LICENSE_FOOTERS
 from primaschema.validate import validate as validate_scheme
 
 logger = logging.getLogger(__name__)
@@ -592,6 +592,11 @@ def remove_contributor(
             f"Index {idx} out of range for contributors in {info_path}. "
             f"Valid range is 0..{len(ps.contributors) - 1}."
         )
+    if len(ps.contributors) == 1:
+        raise ValueError(
+            f"Cannot remove the only contributor from {scheme_label}. "
+            "At least one contributor is required."
+        )
     removed = ps.contributors[idx]
     logger.debug(f"Removing contributor at idx={idx}: {removed}")
     ps.contributors = [c for i, c in enumerate(ps.contributors) if i != idx]
@@ -844,6 +849,11 @@ def remove_target_organism(
     ps = PrimerScheme.model_validate_json(info_path.read_text())
     scheme_label = f"{ps.name}/{ps.amplicon_size}/{ps.version}"
     logger.debug(f"Loaded scheme {scheme_label} from {info_path}")
+    if len(ps.target_organisms) == 1:
+        raise ValueError(
+            f"Cannot remove the only target organism from {scheme_label}. "
+            "At least one target organism is required."
+        )
     if idx >= len(ps.target_organisms):
         raise ValueError(
             f"Index {idx} out of range for target_organisms in {info_path}. "
