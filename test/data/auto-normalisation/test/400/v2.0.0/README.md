@@ -21,7 +21,7 @@
 
 ## Overviews
 
-<div style="width: 100%;"><img src="work/primer.svg" style="width: 100%;" alt="Click to see the source"></div>
+<div style="width: 100%;"><img src="assets/primer.svg" style="width: 100%;" alt="Click to see the source"></div>
 
 ## Details
 

@@ -200,10 +200,10 @@ def _save_and_rebuild_readme(
     generate_readme(scheme_dir, primer_scheme)
 
     if rebuild_plot:
-        logger.debug(f"Ensuring plot output directory in {scheme_dir / 'work'}")
-        (scheme_dir / "work").mkdir(exist_ok=True)
-        logger.debug(f"Rendering primer plot to {scheme_dir / 'work' / 'primer.svg'}")
-        plot_primers(scheme_dir / PRIMER_FILE_NAME, scheme_dir / "work" / "primer.svg")
+        logger.debug(f"Ensuring plot output directory in {scheme_dir / 'assets'}")
+        (scheme_dir / "assets").mkdir(exist_ok=True)
+        logger.debug(f"Rendering primer plot to {scheme_dir / 'assets' / 'primer.svg'}")
+        plot_primers(scheme_dir / PRIMER_FILE_NAME, scheme_dir / "assets" / "primer.svg")
 
 
 def create_status_badge(primer_scheme: PrimerScheme) -> str:
@@ -244,10 +244,6 @@ def generate_readme(path: pathlib.Path, primer_scheme: PrimerScheme):
         if primer_scheme.citations and primer_scheme.citations is not None:
             for cit in primer_scheme.citations:
                 readme.write(f"> If you use this scheme please cite: {cit}\n\n")
-
-        readme.write(
-            f"[primalscheme labs](https://labs.primalscheme.com/detail/{primer_scheme.name}/{primer_scheme.amplicon_size}/{primer_scheme.version})\n\n"
-        )
 
         if primer_scheme.notes and primer_scheme.notes is not None:
             readme.write("## Notes\n\n")
@@ -294,7 +290,7 @@ def generate_readme(path: pathlib.Path, primer_scheme: PrimerScheme):
 
         readme.write("## Overviews\n\n")
         readme.write(
-            '<div style="width: 100%;"><img src="work/primer.svg" style="width: 100%;" alt="Click to see the source"></div>\n\n'
+            '<div style="width: 100%;"><img src="assets/primer.svg" style="width: 100%;" alt="Click to see the source"></div>\n\n'
         )
 
         readme.write("## Details\n\n")
@@ -1100,7 +1096,7 @@ def _rebuild_one(
         primer_sha256=sha256_checksum(info_path.parent / PRIMER_FILE_NAME),
         reference_sha256=sha256_checksum(info_path.parent / REFERENCE_FILE_NAME),
     )
-    _save_and_rebuild_readme(info_path, ps)
+    _save_and_rebuild_readme(info_path, ps, rebuild_plot=True)
     return scheme_label
 
 
