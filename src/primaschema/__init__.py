@@ -17,9 +17,6 @@ DEFAULT_INDEX_URL = (
     "https://raw.githubusercontent.com/pha4ge/primer-schemes/v1b/index.json"
 )
 
-SCHEME_FILES = [METADATA_FILE_NAME, PRIMER_FILE_NAME, REFERENCE_FILE_NAME]
-SCHEME_FILES_EXTRA = ["README.md", "work/primer.svg"]
-
 # Locate schema files via importlib.resources — works for both editable and installed packages.
 SCHEMA_DIR = Path(str(_pkg_files("primaschema").joinpath("schema")))
 INDEX_SCHEMA_PATH = SCHEMA_DIR / INDEX_FILE_NAME
