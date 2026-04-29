@@ -245,10 +245,6 @@ def generate_readme(path: pathlib.Path, primer_scheme: PrimerScheme):
             for cit in primer_scheme.citations:
                 readme.write(f"> If you use this scheme please cite: {cit}\n\n")
 
-        readme.write(
-            f"[primalscheme labs](https://labs.primalscheme.com/detail/{primer_scheme.name}/{primer_scheme.amplicon_size}/{primer_scheme.version})\n\n"
-        )
-
         if primer_scheme.notes and primer_scheme.notes is not None:
             readme.write("## Notes\n\n")
             for note in primer_scheme.notes:
