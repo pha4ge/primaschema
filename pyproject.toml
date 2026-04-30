@@ -4,8 +4,8 @@ build-backend = "flit_core.buildapi"
 
 [project]
 name = "primaschema"
-version = "0.1.0"
-description = "Metadata tooling for pha4ge primerschemes"
+version = "0.3.0"
+description = "Tooling for accessing and managing primer schemes"
 authors = [
     {name = "Bede Constantinides", email="bedeabc@gmail.com"},
     {name = "Chris Kent", email="chrisgkent@protonmail.com"},
