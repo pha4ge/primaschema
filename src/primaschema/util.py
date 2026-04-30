@@ -1,56 +1,110 @@
-import subprocess
-import shutil
-import tarfile
-
+from hashlib import sha256
 from io import BytesIO
 from pathlib import Path
 
-import httpx
+import dnaio
 
-from . import logger
-
-
-def run(cmd, cwd="./"):  # Helper for CLI testing
-    return subprocess.run(
-        cmd, cwd=cwd, shell=True, check=True, text=True, capture_output=True
-    )
+from primaschema import METADATA_FILE_NAME
+from primaschema.schema.info import PrimerScheme
 
 
-def copy_single_child_dir_to_parent(parent_dir_path: Path) -> None:
-    parent_dir = Path(parent_dir_path)
-    child_dirs = [
-        d for d in parent_dir.iterdir() if d.is_dir() and not d.name.startswith(".")
-    ]
-    if len(child_dirs) != 1:
-        raise FileNotFoundError(
-            f"Expected one child directory not starting with a dot, but found {len(child_dirs)}."
-        )
-    child_dir = child_dirs[0]
+def sha256_checksum(filename: Path):
+    """Compute SHA256 checksum for a file.
 
-    for item in child_dir.iterdir():
-        destination = parent_dir / item.name
-        if item.is_dir():
-            shutil.copytree(item, destination, dirs_exist_ok=True)
-        else:
-            shutil.copy2(item, destination)
+    Args:
+        filename: Path to the file.
 
-    shutil.rmtree(child_dir)
+    Returns:
+        Hex digest of the SHA256 checksum.
+    """
+    sha256_hasher = sha256()
+    with open(filename, "rb") as f:
+        for block in iter(lambda: f.read(4096), b""):
+            sha256_hasher.update(block)
+    return sha256_hasher.hexdigest()
 
 
-def download_github_tarball(archive_url: str, out_dir: Path) -> None:
-    if not archive_url.endswith(".tar.gz"):
-        raise ValueError("Archive URL must end with .tar.gz")
+def read_fasta_records(path: Path) -> list[dnaio.SequenceRecord]:
+    """Read FASTA records from a file.
 
-    out_dir = Path(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
+    Args:
+        path: Path to the FASTA file.
 
-    response = httpx.get(archive_url, follow_redirects=True)
-    response.raise_for_status()
+    Returns:
+        List of dnaio.SequenceRecord objects.
+    """
+    with dnaio.open(path) as reader:
+        return list(reader)
 
-    shutil.rmtree(out_dir, ignore_errors=True)
-    with tarfile.open(fileobj=BytesIO(response.content), mode="r:gz") as tf_fh:
-        tf_fh.extractall(out_dir)
 
-    copy_single_child_dir_to_parent(out_dir)
+def write_fasta_records(
+    path: Path,
+    records: list[dnaio.SequenceRecord],
+    line_length: int = 60,
+) -> None:
+    """Write FASTA records to a file.
 
-    logger.info(f"Schemes downloaded and extracted to {out_dir}")
+    Args:
+        path: Output FASTA path.
+        records: Sequence records to write.
+        line_length: Line length for FASTA output.
+    """
+    with dnaio.FastaWriter(path, line_length=line_length) as writer:
+        for record in records:
+            writer.write(record)
+
+
+def serialize_primer_scheme_json(primer_scheme: PrimerScheme) -> bytes:
+    """Serialise a PrimerScheme to JSON bytes with standard formatting.
+
+    Args:
+        primer_scheme: PrimerScheme instance.
+
+    Returns:
+        JSON bytes with consistent formatting.
+    """
+    return primer_scheme.model_dump_json(
+        indent=4,
+        exclude_unset=True,
+        exclude_none=True,
+    ).encode("utf-8")
+
+
+def serialize_fasta_records(records: list[dnaio.SequenceRecord]) -> bytes:
+    """Serialise FASTA records to bytes.
+
+    Args:
+        records: Sequence records to serialise.
+
+    Returns:
+        FASTA-formatted bytes.
+    """
+    buffer = BytesIO()
+    with dnaio.open(buffer, mode="w", fileformat="fasta") as writer:
+        for record in records:
+            writer.write(record)
+    return buffer.getvalue()
+
+
+def reverse_complement(sequence: str) -> str:
+    """Compute the reverse complement of a DNA sequence.
+
+    Args:
+        sequence: Input sequence.
+
+    Returns:
+        Reverse-complemented sequence.
+    """
+    return dnaio.SequenceRecord("sequence", sequence).reverse_complement().sequence
+
+
+def find_all_info_json(primer_schemes_path: Path):
+    """Find all info.json files under a directory.
+
+    Args:
+        primer_schemes_path: Root path to search.
+
+    Returns:
+        List of paths to info.json files.
+    """
+    return list(primer_schemes_path.rglob(f"*/{METADATA_FILE_NAME}"))

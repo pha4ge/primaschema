@@ -1,0 +1,32 @@
+site_name: primaschema
+
+theme:
+  name: "material"
+
+repo_url: https://github.com/pha4ge/primaschema
+
+plugins:
+  - mkdocstrings:
+      default_handler: python
+      handlers:
+        python:
+          options:
+            docstring_style: google
+            show_root_heading: true
+            show_root_full_path: false
+            extensions:
+              - griffe_pydantic
+              # - docs/griffe_ext.py:InjectValidatorDocs
+  - cyclopts
+
+markdown_extensions:
+  - toc:
+      toc_depth: 4
+  - admonition
+
+nav:
+  - Command Line Interface: cli.md
+  - Usage Examples: usage_examples.md
+  - API: api.md
+  - Info Model: info_model.md
+  - Index Model: index_model.md

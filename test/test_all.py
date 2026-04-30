@@ -1,11 +1,17 @@
+import shutil
 import subprocess
-
+from datetime import date
 from pathlib import Path
 
 import pytest
 
+import primaschema.cli as create_module
+import primaschema.get_scheme as get_scheme
 import primaschema.lib as lib
-
+import primaschema.validate as validate_module
+from primaschema.schema.index import PrimerSchemeIndex
+from primaschema.schema.info import PrimerScheme
+from primaschema.util import sha256_checksum
 
 data_dir = Path("test/data")
 
@@ -16,244 +22,395 @@ def run(cmd, cwd=data_dir):  # Helper for CLI testing
     )
 
 
-def test_cli_version():
-    run("primaschema --version")
-
-
-def test_hash_ref():
-    assert (
-        lib.hash_ref(
-            "test/data/primer-schemes/schemes/sars-cov-2/eden/2500/v1.0.0/reference.fasta"
-        )
-        == "primaschema:b1acd7163146bf17"
-    )
-
-
-def test_cli_hash_ref():
-    run_cmd = run(
-        "primaschema hash-ref primer-schemes/schemes/sars-cov-2/eden/2500/v1.0.0/reference.fasta"
-    )
-    assert "primaschema:b1acd7163146bf17" in run_cmd.stdout
-
-
-def test_cli_hash_primer_bed():
-    run_cmd = run(
-        "primaschema hash-bed primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0/primer.bed"
-    )
-    assert "primaschema:3ef3e7bb23008684" in run_cmd.stdout
-
-
-def test_cli_scheme_bed():
-    run_cmd = run(
-        "primaschema hash-bed primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0/scheme.bed"
-    )
-    assert "primaschema:3ef3e7bb23008684" in run_cmd.stdout
-
-
-def test_artic_v41_scheme_hash_matches_primer_hash():
-    scheme_bed_hash = lib.hash_scheme_bed(
-        "test/data/primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0/scheme.bed",
-        "test/data/primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0/reference.fasta",
-    )
-    primer_bed_hash = lib.hash_primer_bed(
-        "test/data/primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0/primer.bed"
-    )
-    assert scheme_bed_hash == primer_bed_hash
-
-
-def test_valid_eden_v1():
-    lib.validate(
-        data_dir / "primer-schemes/schemes/sars-cov-2/eden/2500/v1.0.0",
-    )
-    lib.validate(
-        data_dir / "primer-schemes/schemes/sars-cov-2/eden/2500/v1.0.0",
-        full=True,
-    )
-
-
-def test_valid_artic_v41():
-    lib.validate(
-        data_dir / "primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0",
-    )
-
-
-def test_checksum_case_normalisation():
-    assert lib.hash_bed(
-        data_dir / "primer-schemes/schemes/sars-cov-2/eden/2500/v1.0.0/primer.bed"
-    ) == lib.hash_bed(data_dir / "different-case/eden.modified.primer.bed")
-
-
-def test_cli_valid_recursive():
-    run("primaschema validate --recursive primer-schemes")
-
-
-def test_valid_rebuild():
-    lib.validate(
-        data_dir / "primer-schemes/schemes/sars-cov-2/eden/2500/v1.0.0",
-        rebuild=True,
-    )
-
-
-def test_hash_bed():
-    lib.hash_bed(
-        data_dir / "primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0/primer.bed"
-    )
-    lib.hash_bed(
-        data_dir / "primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0/scheme.bed"
-    )
-
-
-def test_build():
-    run("primaschema build primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0")
-    run("rm -rf artic-v4.1.0")
-
-
-def test_build_recursive():
-    lib.build(data_dir / "primer-schemes", recursive=True)
-    run("rm -rf built")
-
-
-def test_build_manifest():
-    lib.build_manifest(root_dir=data_dir / "primer-schemes")
-    run("rm -rf built index.json", cwd="./")
-
-
-def test_primer_bed_to_scheme_bed():
-    scheme_bed_path = (
-        data_dir / "primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0/scheme.bed"
-    )
-    primer_bed_path = (
-        data_dir / "primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0/primer.bed"
-    )
-    bed_str = lib.convert_primer_bed_to_scheme_bed(bed_path=primer_bed_path)
-    with open(scheme_bed_path) as fh:
-        expected_bed_str = fh.read()
-    assert bed_str == expected_bed_str
-
-
-def test_scheme_bed_to_primer_bed():
-    scheme_bed_path = (
-        data_dir / "primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0/scheme.bed"
-    )
-    primer_bed_path = (
-        data_dir / "primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0/primer.bed"
-    )
-    reference_path = (
-        data_dir / "primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0/reference.fasta"
-    )
-    bed_str = lib.convert_scheme_bed_to_primer_bed(
-        bed_path=scheme_bed_path, fasta_path=reference_path
-    )
-    with open(primer_bed_path) as fh:
-        expected_bed_str = fh.read()
-    assert bed_str == expected_bed_str
-
-
-def test_diff():
-    run_cmd = run(
-        "primaschema diff primer-schemes/schemes/sars-cov-2/midnight/1200/v1.0.0/primer.bed primer-schemes/schemes/sars-cov-2/midnight/1200/v2.0.0/primer.bed"
-    )
-    assert (
-        """SARS-CoV-2_28_LEFT_2""" in run_cmd.stdout.strip()
-        and len(run_cmd.stdout.strip().split("\n")) == 2
-    )
-
-
-def test_calculate_intervals():
-    all_intervals = lib.amplicon_intervals(
-        data_dir / "primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0/primer.bed"
-    )
-    assert "MN908947.3" in all_intervals
-    intervals = all_intervals["MN908947.3"]
-    assert "SARS-CoV-2_99" in intervals
-    assert intervals["SARS-CoV-2_99"] == (29452, 29854)
-
-
-def test_print_intervals():
-    run_cmd = run(
-        "primaschema show-intervals primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0/primer.bed"
-    )
-    assert """MN908947.3\t29452\t29854\tSARS-CoV-2_99\n""" in run_cmd.stdout
-
-
-def test_plot_single_ref_chrom_ref():
+def test_plot_single_ref_chrom_ref(tmp_path: Path):
+    """plot_primers completes without error for a single-chromosome scheme."""
+    out_path = tmp_path / "primer.html"
     lib.plot_primers(
         data_dir / "primer-schemes/schemes/sars-cov-2/artic/400/v4.1.0/primer.bed",
+        out_path=out_path,
     )
-    run("rm -rf primer.html", cwd="./")
+    assert out_path.exists()
 
 
-def test_plot_many_ref_chroms_ref():
-    lib.plot_primers(data_dir / "many-ref-chroms/primer.bed")
-    run("rm -rf primer.html", cwd="./")
+def test_plot_many_ref_chroms_ref(tmp_path: Path):
+    """plot_primers handles a scheme with multiple reference chromosomes."""
+    out_path = tmp_path / "primer.html"
+    lib.plot_primers(data_dir / "many-ref-chroms/primer.bed", out_path=out_path)
+    assert out_path.exists()
 
 
-def test_6to7_many_ref_chroms():
-    scheme_bed_path = data_dir / "many-ref-chroms/scheme.bed"
-    primer_bed_path = data_dir / "many-ref-chroms/primer.bed"
-    reference_path = data_dir / "many-ref-chroms/reference.fasta"
-    bed_str = lib.convert_scheme_bed_to_primer_bed(
-        bed_path=scheme_bed_path, fasta_path=reference_path
+def _copy_scheme(tmp_path: Path, rel_path: str) -> Path:
+    src = data_dir / rel_path
+    dest = tmp_path / rel_path
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(src, dest)
+    return dest
+
+
+def _copy_scheme_to(src_rel_path: str, dest: Path) -> Path:
+    src = data_dir / src_rel_path
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(src, dest)
+    return dest
+
+
+def test_validate_autonormalize_primer_bed(tmp_path: Path):
+    """validate --fix rewrites an out-of-order primer.bed to match the stored checksum."""
+    scheme_dir = _copy_scheme(
+        tmp_path,
+        "auto-normalisation/test/400/v2.0.0",
     )
-    with open(primer_bed_path) as fh:
-        expected_bed_str = fh.read()
-    assert bed_str == expected_bed_str
+    info_path = scheme_dir / "info.json"
+    primer_path = scheme_dir / "primer.bed"
+    primer_scheme = PrimerScheme.model_validate_json(info_path.read_text())
+
+    assert sha256_checksum(primer_path) != primer_scheme.checksums.primer_sha256
+
+    validate_module.validate(info_path, strict=True, fix=True)
+
+    assert sha256_checksum(primer_path) == primer_scheme.checksums.primer_sha256
 
 
-def test_invalid_duplicate_primers():
-    with pytest.raises(ValueError):  # Also catches pydantic.ValidationError
-        lib.validate(
-            data_dir / "broken/duplicated-primers",
+def test_validate_autonormalize_reference_fasta(tmp_path: Path):
+    """validate --fix rewrites a malformatted reference.fasta to match the stored checksum."""
+    scheme_dir = _copy_scheme(
+        tmp_path,
+        "auto-normalisation/test/400/v2.0.0",
+    )
+    info_path = scheme_dir / "info.json"
+    reference_path = scheme_dir / "reference.fasta"
+    primer_scheme = PrimerScheme.model_validate_json(info_path.read_text())
+
+    assert sha256_checksum(reference_path) != primer_scheme.checksums.reference_sha256
+
+    validate_module.validate(info_path, strict=True, fix=True)
+
+    assert sha256_checksum(reference_path) == primer_scheme.checksums.reference_sha256
+
+
+def test_validate_all_aggregates_errors_create_cli(tmp_path: Path):
+    """validate --all via CLI collects errors from multiple bad schemes into one message."""
+    bad1 = tmp_path / "bad1" / "999" / "v0.0.1"
+    bad2 = tmp_path / "bad2" / "999" / "v0.0.2"
+    _copy_scheme_to("auto-normalisation/test/400/v2.0.0", bad1)
+    _copy_scheme_to("auto-normalisation/test/400/v2.0.0", bad2)
+
+    with pytest.raises(ValueError) as exc:
+        create_module.validate(
+            path=tmp_path,
+            all=True,
+            additional_linkml=False,
+            strict=True,
+        )
+
+    msg = str(exc.value)
+    assert "bad1" in msg
+    assert "bad2" in msg
+
+
+def test_validate_all_aggregates_errors_module(tmp_path: Path):
+    """validate_all() module function collects errors from multiple bad schemes into one message."""
+    bad1 = tmp_path / "bad1" / "999" / "v0.0.1"
+    bad2 = tmp_path / "bad2" / "999" / "v0.0.2"
+    _copy_scheme_to("auto-normalisation/test/400/v2.0.0", bad1)
+    _copy_scheme_to("auto-normalisation/test/400/v2.0.0", bad2)
+
+    with pytest.raises(ValueError) as exc:
+        validate_module.validate_all(tmp_path, additional_linkml=False, strict=True)
+
+    msg = str(exc.value)
+    assert "bad1" in msg
+    assert "bad2" in msg
+
+
+def test_cli_create():
+    """primaschema create produces info.json, primer.bed, and reference.fasta on disk."""
+    run("mkdir -p built && rm -rf built/artic", cwd="./")
+    run(
+        "uv run primaschema create"
+        " --name artic"
+        " --amplicon-size 400"
+        " --version v4.1.0"
+        " --contributors 'ARTIC network'"
+        " --target-organisms sars-cov-2"
+        " --status DEPRECATED"
+        " --date-created 2020-09-04"
+        " --bed-path test/data/dev-scheme/primer.bed"
+        " --reference-path test/data/dev-scheme/reference.fasta"
+        " --primer-schemes-path built",
+        cwd="./",
+    )
+    assert Path("built/artic/400/v4.1.0/primer.bed").exists()
+    assert Path("built/artic/400/v4.1.0/reference.fasta").exists()
+    assert Path("built/artic/400/v4.1.0/info.json").exists()
+    run("rm -rf built/artic", cwd="./")
+
+
+@pytest.mark.network
+def test_get_scheme(tmp_path: Path):
+    """download_schemes fetches a real scheme from the default index."""
+    psi = get_scheme.load_index(get_scheme.DEFAULT_INDEX_URL)
+    schemes = get_scheme.resolve_schemes(
+        index=psi,
+        scheme_id="artic/400/v4.1.0",
+        allow_multiple=False,
+        all_schemes=False,
+    )
+    outputs = get_scheme.download_schemes(schemes=schemes, output=tmp_path)
+    output_dir = outputs[0]
+    assert (output_dir / "info.json").exists()
+    assert (output_dir / "primer.bed").exists()
+    assert (output_dir / "reference.fasta").exists()
+
+
+def test_get_scheme_invalid_id():
+    """resolve_schemes raises ValueError for a scheme_id with too many path segments."""
+    with pytest.raises(ValueError, match="expected format"):
+        get_scheme.resolve_schemes(
+            index=PrimerSchemeIndex(),
+            scheme_id="artic/400/v1.0.0/extra",
+            allow_multiple=False,
+            all_schemes=False,
         )
 
 
-def test_invalid_primer_bounds():
-    with pytest.raises(ValueError):  # Also catches pydantic.ValidationError
-        lib.validate(
-            data_dir / "broken/primer-bounds",
+@pytest.mark.network
+def test_get_scheme_nonexistent(tmp_path: Path):
+    """resolve_schemes raises ValueError when the scheme_id is not in the index."""
+    psi = get_scheme.load_index(get_scheme.DEFAULT_INDEX_URL)
+    with pytest.raises(ValueError, match="not found"):
+        get_scheme.resolve_schemes(
+            index=psi,
+            scheme_id="nonexistent/999/v0.0.0",
+            allow_multiple=False,
+            all_schemes=False,
         )
 
 
-def test_invalid_amplicon_tiling():
-    with pytest.raises(ValueError):  # Also catches pydantic.ValidationError
-        lib.validate(
-            data_dir / "broken/non-tiling",
+def test_rebuild_syncs_metadata_from_path(tmp_path: Path):
+    """rebuild --sync-metadata updates name, amplicon_size, and version from the directory path."""
+    src = data_dir / "auto-normalisation/test/400/v2.0.0"
+    dest = tmp_path / "artic-sars-cov-2" / "1200" / "v9.9.9"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(src, dest)
+    info_path = dest / "info.json"
+    primer_scheme = PrimerScheme.model_validate_json(info_path.read_text())
+    assert primer_scheme.name != "artic-sars-cov-2"
+    assert primer_scheme.amplicon_size != 1200
+    assert primer_scheme.version != "v9.9.9"
+
+    from primaschema.cli import _rebuild_one
+
+    _rebuild_one(info_path, sync_metadata=True)
+
+    updated_scheme = PrimerScheme.model_validate_json(info_path.read_text())
+    assert updated_scheme.name == "artic-sars-cov-2"
+    assert updated_scheme.amplicon_size == 1200
+    assert updated_scheme.version == "v9.9.9"
+
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+
+def _minimal_scheme(**kwargs) -> PrimerScheme:
+    from primaschema.schema.info import Contributor, SchemeStatus, TargetOrganism
+
+    defaults = dict(
+        schema_version="1.0.0",
+        name="test-scheme",
+        amplicon_size=400,
+        version="v1.0.0",
+        contributors=[Contributor(name="Alice")],
+        target_organisms=[TargetOrganism(common_name="SARS-CoV-2")],
+        status=SchemeStatus.DRAFT,
+    )
+    defaults.update(kwargs)
+    return PrimerScheme(**defaults)
+
+
+# ---------------------------------------------------------------------------
+# Unit tests — SchemeLicense
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "spdx",
+    [
+        "CC0-1.0",
+        "CC-BY-4.0",
+        "CC-BY-SA-4.0",
+        "CC-BY-NC-4.0",
+        "CC-BY-NC-SA-4.0",
+        "CC-BY-ND-4.0",
+        "CC-BY-NC-ND-4.0",
+    ],
+)
+def test_scheme_license_all_values_accessible(spdx):
+    """Every SPDX license string round-trips through SchemeLicense(value).value."""
+    from primaschema.schema.info import SchemeLicense
+
+    assert SchemeLicense(spdx).value == spdx
+
+
+def test_license_footers_covers_all_licenses():
+    """LICENSE_FOOTERS has an entry for every SchemeLicense member."""
+    from primaschema.license_footers import LICENSE_FOOTERS
+    from primaschema.schema.info import SchemeLicense
+
+    for member in SchemeLicense:
+        assert member in LICENSE_FOOTERS, f"Missing footer for {member}"
+
+
+@pytest.mark.parametrize(
+    "license,url_fragment",
+    [
+        ("CC0-1.0", "publicdomain/zero/1.0"),
+        ("CC-BY-4.0", "licenses/by/4.0"),
+        ("CC-BY-SA-4.0", "licenses/by-sa/4.0"),
+        ("CC-BY-NC-4.0", "licenses/by-nc/4.0"),
+        ("CC-BY-NC-SA-4.0", "licenses/by-nc-sa/4.0"),
+        ("CC-BY-ND-4.0", "licenses/by-nd/4.0"),
+        ("CC-BY-NC-ND-4.0", "licenses/by-nc-nd/4.0"),
+    ],
+)
+def test_license_footer_contains_url(license, url_fragment):
+    """Each license footer contains the canonical CC URL for that license."""
+    from primaschema.license_footers import LICENSE_FOOTERS
+    from primaschema.schema.info import SchemeLicense
+
+    assert url_fragment in LICENSE_FOOTERS[SchemeLicense(license)]
+
+
+# ---------------------------------------------------------------------------
+# Unit tests — date fields
+# ---------------------------------------------------------------------------
+
+
+def test_primer_scheme_dates_optional():
+    """PrimerScheme can be constructed without dates; both default to None."""
+    ps = _minimal_scheme()
+    assert ps.date_created is None
+    assert ps.date_added is None
+
+
+def test_primer_scheme_dates_accept_valid():
+    """PrimerScheme accepts date objects for date_created and date_added."""
+    ps = _minimal_scheme(date_created=date(2024, 1, 15), date_added=date(2024, 6, 1))
+    assert ps.date_created == date(2024, 1, 15)
+    assert ps.date_added == date(2024, 6, 1)
+
+
+def test_cli_scheme_date_created_required():
+    """CLIPrimerScheme raises ValidationError when date_created is omitted."""
+    from pydantic import ValidationError
+
+    from primaschema.cli import CLIPrimerScheme
+    from primaschema.schema.info import Contributor, SchemeStatus, TargetOrganism
+
+    with pytest.raises(ValidationError):
+        CLIPrimerScheme(
+            schema_version="1.0.0",
+            name="test",
+            amplicon_size=400,
+            version="v1.0.0",
+            status=SchemeStatus.DRAFT,
+            contributors=[Contributor(name="Alice")],
+            target_organisms=[TargetOrganism(common_name="SARS-CoV-2")],
         )
 
 
-def test_format_primer_bed():
-    """Sort BED into maximally compatible output order"""
-    assert lib.format_primer_bed(data_dir / "unordered/primer.bed").strip() == (
-        """MN908947.3	25	50	SARS-CoV-2_1_LEFT_1	1	+	AACAAACCAACCAACTTTCGATCTC
-MN908947.3	408	431	SARS-CoV-2_1_RIGHT_1	1	-	CTTCTACTAAGCCACAAGTGCCA
-MN908947.3	324	344	SARS-CoV-2_2_LEFT_1	2	+	TTTACAGGTTCGCGACGTGC
-MN908947.3	705	727	SARS-CoV-2_2_RIGHT_1	2	-	ATAAGGATCAGTGCCAAGCTCG"""
+def test_cli_scheme_date_added_defaults_to_today():
+    """CLIPrimerScheme sets date_added to today when not explicitly provided."""
+    from primaschema.cli import CLIPrimerScheme
+    from primaschema.schema.info import Contributor, SchemeStatus, TargetOrganism
+
+    ps = CLIPrimerScheme(
+        schema_version="1.0.0",
+        name="test",
+        amplicon_size=400,
+        version="v1.0.0",
+        status=SchemeStatus.DRAFT,
+        contributors=[Contributor(name="Alice")],
+        target_organisms=[TargetOrganism(common_name="SARS-CoV-2")],
+        date_created=date(2024, 1, 1),
+    )
+    assert ps.date_added == date.today()
+
+
+# ---------------------------------------------------------------------------
+# Integration tests — generate_readme
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "license,url_fragment",
+    [
+        ("CC0-1.0", "publicdomain/zero/1.0"),
+        ("CC-BY-4.0", "licenses/by/4.0"),
+        ("CC-BY-SA-4.0", "licenses/by-sa/4.0"),
+        ("CC-BY-NC-4.0", "licenses/by-nc/4.0"),
+        ("CC-BY-NC-SA-4.0", "licenses/by-nc-sa/4.0"),
+        ("CC-BY-ND-4.0", "licenses/by-nd/4.0"),
+        ("CC-BY-NC-ND-4.0", "licenses/by-nc-nd/4.0"),
+    ],
+)
+def test_readme_license_footer_written(tmp_path, license, url_fragment):
+    """generate_readme writes the correct license footer for each CC license."""
+    from primaschema.cli import generate_readme
+    from primaschema.schema.info import SchemeLicense
+
+    ps = _minimal_scheme(license=SchemeLicense(license))
+    generate_readme(tmp_path, ps)
+    readme = (tmp_path / "README.md").read_text()
+    assert (
+        "------------------------------------------------------------------------"
+        in readme
+    )
+    assert url_fragment in readme
+
+
+def test_readme_no_footer_when_no_license(tmp_path):
+    """generate_readme omits the license footer section when license is None."""
+    from primaschema.cli import generate_readme
+
+    ps = _minimal_scheme(license=None)
+    generate_readme(tmp_path, ps)
+    readme = (tmp_path / "README.md").read_text()
+    assert (
+        "------------------------------------------------------------------------"
+        not in readme
     )
 
 
-def test_invalid_missing_field():
-    with pytest.raises(ValueError):  # Also catches pydantic.ValidationError
-        lib.validate(data_dir / "broken/info-yml/missing-field")
-        lib.validate(data_dir / "broken/info-yml/missing-field", full=True)
+def test_readme_contains_dates_in_json(tmp_path):
+    """generate_readme includes date_created and date_added in the embedded JSON block."""
+    from primaschema.cli import generate_readme
+
+    ps = _minimal_scheme(date_created=date(2024, 1, 15), date_added=date(2024, 6, 1))
+    generate_readme(tmp_path, ps)
+    readme = (tmp_path / "README.md").read_text()
+    assert "2024-01-15" in readme
+    assert "2024-06-01" in readme
 
 
-def test_invalid_extra_field():
-    with pytest.raises(ValueError):  # Also catches pydantic.ValidationError
-        lib.validate(data_dir / "broken/info-yml/extra-field")
-        lib.validate(data_dir / "broken/info-yml/extra-field", full=True)
+def test_dates_round_trip():
+    """Dates survive serialize → deserialize via serialize_primer_scheme_json."""
+    from primaschema.util import serialize_primer_scheme_json
+
+    ps = _minimal_scheme(date_created=date(2024, 1, 15), date_added=date(2024, 6, 1))
+    json_bytes = serialize_primer_scheme_json(ps)
+    restored = PrimerScheme.model_validate_json(json_bytes)
+    assert restored.date_created == date(2024, 1, 15)
+    assert restored.date_added == date(2024, 6, 1)
 
 
-def test_subset():
-    lib.subset(scheme_dir=data_dir / "many-ref-chroms", chrom="NC_038235.1")
-    df = lib.parse_primer_bed("built/primer.bed")
-    assert len(df) == 4
-    run("rm -rf built", cwd="./")
+def test_dates_absent_when_none():
+    """None dates are excluded from the serialized JSON (exclude_none=True)."""
+    from primaschema.util import serialize_primer_scheme_json
 
-
-def test_commented_bed():
-    lib.validate(data_dir / "bed-comment")
-
-
-def test_dev_scheme():
-    # lib.validate(data_dir / "dev-scheme")
-    lib.validate(data_dir / "dev-scheme", full=True)
+    ps = _minimal_scheme()
+    json_bytes = serialize_primer_scheme_json(ps)
+    assert b"date_created" not in json_bytes
+    assert b"date_added" not in json_bytes

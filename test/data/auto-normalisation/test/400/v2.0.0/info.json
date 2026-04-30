@@ -1,0 +1,37 @@
+{
+  "schema_version": "1.0.0-alpha",
+  "name": "test",
+  "amplicon_size": 400,
+  "version": "v2.0.0",
+  "contributors": [
+    {
+      "name": "Chris"
+    },
+    {
+      "name": "Chris2"
+    }
+  ],
+  "target_organisms": [
+    {
+      "common_name": "SARs-CoV-2"
+    },
+    {
+      "common_name": "SARs-CoV"
+    }
+  ],
+  "license": "CC-BY-SA-4.0",
+  "status": "DRAFT",
+  "vendors": [
+    {
+      "organisation_name": "idt"
+    }
+  ],
+  "algorithm": {
+    "name": "PrimalScheme",
+    "version": "3.01"
+  },
+  "checksums": {
+    "primer_sha256": "f3154104f2ac9d94bc33d59067e1b00e0765a11c19dee9546b6596ae18b805f3",
+    "reference_sha256": "9e08a5c6ccabc87074b46989335c3bacdb9662cd5aa3058451255ded8e436226"
+  }
+}

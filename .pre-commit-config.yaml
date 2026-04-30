@@ -1,7 +1,24 @@
 repos:
-- repo: https://github.com/astral-sh/ruff-pre-commit
-  rev: v0.4.4
-  hooks:
-    - id: ruff
-      args: [ --fix ]
-    - id: ruff-format
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    # Ruff version.
+    rev: v0.14.6
+    hooks:
+      # Run the linter.
+      - id: ruff
+        args: [--fix, --show-fixes]
+      # Run the formatter.
+      - id: ruff-format
+  - repo: https://github.com/astral-sh/uv-pre-commit
+    # uv version.
+    rev: 0.7.11
+    hooks:
+      - id: uv-lock
+      - id: uv-export
+  - repo: local
+    hooks:
+      - id: gen-pydantic
+        name: Generate Pydantic models from LinkML schema
+        entry: bash -c 'uv run gen-pydantic "src/primaschema/schema/info.yml" --meta None > "src/primaschema/schema/info.py"'
+        language: system
+        files: ^src/primaschema/schema/info\.(yml|py)$
+        pass_filenames: false
