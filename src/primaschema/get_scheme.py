@@ -21,8 +21,12 @@ from primaschema import (
     REFERENCE_FILE_NAME,
 )
 from primaschema.schema.index import IndexPrimerScheme, PrimerSchemeIndex
-from primaschema.schema.info import PrimerScheme
-from primaschema.util import serialize_fasta_records, serialize_primer_scheme_json
+from primaschema.schema.primer_scheme import PrimerScheme
+from primaschema.util import (
+    ensure_path_within,
+    serialize_fasta_records,
+    serialize_primer_scheme_json,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +62,20 @@ def _ensure_https(url: str) -> None:
     parsed = urlparse(url)
     if parsed.scheme != "https":
         raise ValueError(f"Only https URLs are allowed: {url}")
+
+
+def _reject_non_https_request(request: httpx.Request) -> None:
+    """httpx "request" event hook: re-validate scheme on every hop.
+
+    httpx.Client follows redirects internally by issuing further requests
+    without re-running any upfront scheme check - an initially-https:// URL
+    could redirect to an internal http:// address (or an attacker-controlled
+    https:// one), e.g. a cloud metadata endpoint. Registering this as a
+    request event hook makes it fire on every request in the redirect chain,
+    not just the first one.
+    """
+    if request.url.scheme != "https":
+        raise ValueError(f"Only https URLs are allowed: {request.url}")
 
 
 def _read_index_bytes(source: str) -> bytes:
@@ -135,34 +153,46 @@ def _download_bytes(url: str, *, timeout: float | None = None) -> bytes:
 
     Raises:
         ValueError: If the URL scheme is not HTTPS.
-        DownloadError: If the download exceeds size limits.
-        httpx.HTTPError: If the request fails.
+        DownloadError: If the download exceeds size limits, or the request fails.
     """
     _ensure_https(url)
-    with httpx.stream(
-        "GET",
-        url,
-        follow_redirects=True,
-        timeout=_resolve_timeout(timeout),
-    ) as resp:
-        resp.raise_for_status()
-        content_length = resp.headers.get("Content-Length")
-        if content_length is not None:
-            try:
-                if int(content_length) > MAX_DOWNLOAD_BYTES:
+    try:
+        with (
+            httpx.Client(
+                event_hooks={"request": [_reject_non_https_request]}
+            ) as client,
+            client.stream(
+                "GET",
+                url,
+                follow_redirects=True,
+                timeout=_resolve_timeout(timeout),
+            ) as resp,
+        ):
+            resp.raise_for_status()
+            content_length = resp.headers.get("Content-Length")
+            if content_length is not None:
+                try:
+                    if int(content_length) > MAX_DOWNLOAD_BYTES:
+                        raise DownloadError(
+                            f"{url} exceeds max size of {MAX_DOWNLOAD_MB} MB"
+                        )
+                except ValueError:
+                    pass
+            total = 0
+            chunks: list[bytes] = []
+            for chunk in resp.iter_bytes():
+                total += len(chunk)
+                if total > MAX_DOWNLOAD_BYTES:
                     raise DownloadError(
                         f"{url} exceeds max size of {MAX_DOWNLOAD_MB} MB"
                     )
-            except ValueError:
-                pass
-        total = 0
-        chunks: list[bytes] = []
-        for chunk in resp.iter_bytes():
-            total += len(chunk)
-            if total > MAX_DOWNLOAD_BYTES:
-                raise DownloadError(f"{url} exceeds max size of {MAX_DOWNLOAD_MB} MB")
-            chunks.append(chunk)
-    return b"".join(chunks)
+                chunks.append(chunk)
+        return b"".join(chunks)
+    except httpx.HTTPError as exc:
+        # 404s, timeouts and connection errors are expected failures, not bugs.
+        # Re-raise as DownloadError so the CLI prints a message rather than a
+        # traceback (see _EXPECTED_EXCEPTIONS in cli.py).
+        raise DownloadError(f"Failed to download {url}: {exc}") from exc
 
 
 def _get_and_validate_info_json(
@@ -293,22 +323,74 @@ def _get_and_validate_reference_fasta(
     return records, fasta_bytes
 
 
-def load_index(source: str, *, timeout: float | None = None) -> PrimerSchemeIndex:
+def _decompress_gzip_bounded(raw: bytes, max_bytes: int) -> bytes:
+    """Decompress gzip bytes, raising if the decompressed size exceeds max_bytes.
+
+    gzip.decompress() has no output-size limit, so a small (and already
+    size-checked-while-compressed) gzip payload can still expand to an
+    arbitrarily large blob in memory - a decompression bomb. Reading via
+    GzipFile in bounded chunks lets us stop as soon as the cap is exceeded
+    instead of materialising the full output first.
+
+    Args:
+        raw: Compressed gzip bytes.
+        max_bytes: Maximum allowed decompressed size.
+
+    Returns:
+        Decompressed bytes.
+
+    Raises:
+        DownloadError: If the decompressed size exceeds max_bytes.
+    """
+    chunks: list[bytes] = []
+    total = 0
+    with gzip.GzipFile(fileobj=BytesIO(raw)) as gz:
+        while True:
+            chunk = gz.read(64 * 1024)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > max_bytes:
+                raise DownloadError(
+                    f"Decompressed index exceeds max size of "
+                    f"{max_bytes // (1024 * 1024)} MB"
+                )
+            chunks.append(chunk)
+    return b"".join(chunks)
+
+
+def load_index(
+    source: str, *, timeout: float | None = None, force: bool = False
+) -> PrimerSchemeIndex:
     """Load a PrimerSchemeIndex from a URL or local file.
 
     Args:
         source: URL or path to index JSON (optionally gzipped).
         timeout: Timeout in seconds for URL fetches.
+        force: If True, warn rather than raise when entries disagree with the
+            dict keys they are filed under.
 
     Returns:
         Parsed PrimerSchemeIndex.
+
+    Raises:
+        ValueError: If the index is corrupted and force is False.
     """
     if source.startswith("http"):
         raw = _download_bytes(source, timeout=timeout)
     else:
         raw = _read_index_bytes(source)
-    data = gzip.decompress(raw) if source.endswith(".gz") else raw
-    return PrimerSchemeIndex.model_validate_json(data)
+    data = (
+        _decompress_gzip_bounded(raw, MAX_DOWNLOAD_BYTES)
+        if source.endswith(".gz")
+        else raw
+    )
+    index = PrimerSchemeIndex.model_validate_json(data)
+    # Validate here rather than per-lookup: this is the one path every index
+    # takes, so it covers --all (which reaches entries via flatten()) as well
+    # as name-only lookups.
+    index.validate_keys(force=force)
+    return index
 
 
 def _require_checksums(index: IndexPrimerScheme, force: bool) -> None:
@@ -321,12 +403,15 @@ def _require_checksums(index: IndexPrimerScheme, force: bool) -> None:
     Raises:
         DownloadError: If checksums are missing and force is False.
     """
-    if index.checksums is None:
+    if index.primer_scheme_checksums is None:
         if force:
             logger.warning("Missing checksums in index; continuing due to --force")
             return
         raise DownloadError("Checksums are required in the index")
-    if not index.checksums.primer_sha256 or not index.checksums.reference_sha256:
+    if (
+        not index.primer_scheme_checksums.primer_scheme_sha256
+        or not index.primer_scheme_checksums.reference_sequence_sha256
+    ):
         if force:
             logger.warning("Incomplete checksums in index; continuing due to --force")
             return
@@ -413,7 +498,6 @@ def _download_scheme_entry(
     timeout: float | None,
     check_output_exists: bool,
     suppress_log: bool,
-    requested_id: str | None = None,
 ) -> Path:
     """Download and validate a single scheme into a target root directory.
 
@@ -425,7 +509,6 @@ def _download_scheme_entry(
         sanitisation: RAW or CANONICAL output mode.
         timeout: Timeout in seconds for downloads.
         check_output_exists: Whether to check existing output dir.
-        requested_id: Optional requested scheme id for validation.
 
     Returns:
         Path to the downloaded scheme directory.
@@ -433,15 +516,18 @@ def _download_scheme_entry(
     Raises:
         DownloadError: If validation or download fails.
     """
-    if requested_id and scheme.relative_path != requested_id:
-        msg = f"Index entry path {scheme.relative_path} does not match requested {requested_id}"
-        if strict:
-            raise DownloadError(msg)
-        logger.warning(msg)
-
     _require_checksums(scheme, force=force)
 
-    output_dir = output / scheme.name / str(scheme.amplicon_size) / scheme.version
+    output_dir = (
+        output
+        / scheme.primer_scheme_name
+        / str(scheme.amplicon_size)
+        / scheme.primer_scheme_version
+    )
+    # Defense-in-depth: name/version are already pattern-constrained on
+    # IndexPrimerScheme, but this confirms the resolved path actually stays
+    # under `output` regardless of what produced the index entry.
+    output_dir = ensure_path_within(output, output_dir)
     if check_output_exists and output_dir.exists():
         msg = f"Output directory already exists: {output_dir}"
         if strict:
@@ -453,8 +539,12 @@ def _download_scheme_entry(
         with tempfile.TemporaryDirectory() as tmp_dir:
             tmp_dir_path = Path(tmp_dir)
             tmp_scheme_dir = (
-                tmp_dir_path / scheme.name / str(scheme.amplicon_size) / scheme.version
+                tmp_dir_path
+                / scheme.primer_scheme_name
+                / str(scheme.amplicon_size)
+                / scheme.primer_scheme_version
             )
+            tmp_scheme_dir = ensure_path_within(tmp_dir_path, tmp_scheme_dir)
             tmp_scheme_dir.mkdir(parents=True, exist_ok=True)
 
             info_scheme, info_bytes = _get_and_validate_info_json(
@@ -492,17 +582,17 @@ def _download_scheme_entry(
                 scheme_bed.bedlines, str(tmp_scheme_dir / REFERENCE_FILE_NAME)
             )
 
-            if scheme.checksums:
-                if scheme.checksums.primer_sha256:
+            if scheme.primer_scheme_checksums:
+                if scheme.primer_scheme_checksums.primer_scheme_sha256:
                     _verify_checksum(
                         tmp_scheme_dir / PRIMER_FILE_NAME,
-                        scheme.checksums.primer_sha256,
+                        scheme.primer_scheme_checksums.primer_scheme_sha256,
                         force=force,
                     )
-                if scheme.checksums.reference_sha256:
+                if scheme.primer_scheme_checksums.reference_sequence_sha256:
                     _verify_checksum(
                         tmp_scheme_dir / REFERENCE_FILE_NAME,
-                        scheme.checksums.reference_sha256,
+                        scheme.primer_scheme_checksums.reference_sequence_sha256,
                         force=force,
                     )
 
@@ -552,7 +642,13 @@ def download_schemes(
         raise ValueError("No schemes provided")
 
     for scheme in schemes:
-        output_dir = output / scheme.name / str(scheme.amplicon_size) / scheme.version
+        output_dir = (
+            output
+            / scheme.primer_scheme_name
+            / str(scheme.amplicon_size)
+            / scheme.primer_scheme_version
+        )
+        output_dir = ensure_path_within(output, output_dir)
         if output_dir.exists():
             msg = f"Output directory already exists: {output_dir}"
             if strict:
@@ -577,7 +673,6 @@ def download_schemes(
                     timeout,
                     False,
                     True,
-                    scheme.relative_path,
                 ): scheme.relative_path
                 for scheme in schemes
             }
@@ -596,9 +691,18 @@ def download_schemes(
         final_outputs: list[Path] = []
         for scheme in schemes:
             source_dir = (
-                staging_root / scheme.name / str(scheme.amplicon_size) / scheme.version
+                staging_root
+                / scheme.primer_scheme_name
+                / str(scheme.amplicon_size)
+                / scheme.primer_scheme_version
             )
-            dest_dir = output / scheme.name / str(scheme.amplicon_size) / scheme.version
+            dest_dir = (
+                output
+                / scheme.primer_scheme_name
+                / str(scheme.amplicon_size)
+                / scheme.primer_scheme_version
+            )
+            dest_dir = ensure_path_within(output, dest_dir)
             dest_dir.mkdir(parents=True, exist_ok=True)
             for filename in (METADATA_FILE_NAME, PRIMER_FILE_NAME, REFERENCE_FILE_NAME):
                 shutil.copy2(source_dir / filename, dest_dir / filename)

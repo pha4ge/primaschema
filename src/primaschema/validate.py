@@ -12,10 +12,14 @@ from pydantic_core import from_json
 from primaschema import (
     METADATA_FILE_NAME,
     PRIMER_FILE_NAME,
+    README_FILE_NAME,
     REFERENCE_FILE_NAME,
     SCHEMA_DIR,
 )
-from primaschema.schema.info import PrimerScheme
+from primaschema.schema.primer_scheme import (
+    PrimerScheme,
+    check_primer_scheme_identifier,
+)
 from primaschema.util import read_fasta_records, sha256_checksum, write_fasta_records
 
 logger = logging.getLogger(__name__)
@@ -113,16 +117,16 @@ def validate_name(infopath: Path, primer_scheme: PrimerScheme | None = None):
         primer_scheme = PrimerScheme.model_validate_json(infopath.read_text())
 
     scheme_subpath = (
-        Path(primer_scheme.name)
+        Path(primer_scheme.primer_scheme_name)
         / str(primer_scheme.amplicon_size)
-        / primer_scheme.version
+        / primer_scheme.primer_scheme_version
     )
 
     # Check the info version matches path version
     version_path = infopath.parent.name
-    if primer_scheme.version != version_path:
+    if primer_scheme.primer_scheme_version != version_path:
         raise ValueError(
-            f"Version mismatch for {scheme_subpath}: info ({primer_scheme.version}) != path ({version_path})"
+            f"Version mismatch for {scheme_subpath}: info ({primer_scheme.primer_scheme_version}) != path ({version_path})"
         )
 
     # Check the amplicon size matches the schemepath
@@ -134,10 +138,39 @@ def validate_name(infopath: Path, primer_scheme: PrimerScheme | None = None):
 
     # Check the schemepath matches the path
     schemeid_path = infopath.parent.parent.parent.name
-    if primer_scheme.name != schemeid_path:
+    if primer_scheme.primer_scheme_name != schemeid_path:
         raise ValueError(
-            f"Name mismatch for {scheme_subpath}: info ({primer_scheme.name}) != path ({schemeid_path})"
+            f"Name mismatch for {scheme_subpath}: info ({primer_scheme.primer_scheme_name}) != path ({schemeid_path})"
         )
+
+
+def validate_identifier(infopath: Path, primer_scheme: PrimerScheme | None = None):
+    """Validate a stored primer_scheme_identifier against the other fields.
+
+    primer_scheme_identifier is computed and self-healed by the PrimerScheme
+    model itself, so a wrong value in the parsed object would already be
+    silently corrected. To catch a genuinely wrong value on disk, this reads
+    the file's raw JSON directly instead of relying on the parsed object.
+
+    Args:
+        infopath: Path to info.json.
+        primer_scheme: Optional PrimerScheme instance to avoid re-parsing.
+
+    Raises:
+        ValueError: If the file provides a primer_scheme_identifier that
+            disagrees with the one computed from name/amplicon_size/version.
+    """
+    if primer_scheme is None:
+        primer_scheme = PrimerScheme.model_validate_json(infopath.read_text())
+
+    raw = from_json(infopath.read_text())
+    check_primer_scheme_identifier(
+        raw.get("primer_scheme_identifier"),
+        primer_scheme.primer_scheme_name,
+        primer_scheme.amplicon_size,
+        primer_scheme.primer_scheme_version,
+        source=str(infopath),
+    )
 
 
 def validate_readme(infopath: Path, primer_scheme: PrimerScheme | None = None):
@@ -155,30 +188,24 @@ def validate_readme(infopath: Path, primer_scheme: PrimerScheme | None = None):
     if primer_scheme is None:
         primer_scheme = PrimerScheme.model_validate_json(infopath.read_text())
 
-    scheme_subpath = (
-        Path(primer_scheme.name)
-        / str(primer_scheme.amplicon_size)
-        / primer_scheme.version
-    )
-
-    # Check the ReadME.md
-    readme = infopath.parent / "README.md"
+    # Check the README.md
+    readme = infopath.parent / README_FILE_NAME
     if not readme.exists():
         raise FileNotFoundError(f"{readme} does not exist")
 
     # Check the readme has been updated
-    readme = readme.read_text()
-    if readme.find(primer_scheme.name) == -1:
+    readme_text = readme.read_text()
+    if readme_text.find(primer_scheme.primer_scheme_name) == -1:
         raise ValueError(
-            f"Scheme name ({primer_scheme.name}) not found in {readme}: {scheme_subpath}"
+            f"Scheme name ({primer_scheme.primer_scheme_name}) not found in {README_FILE_NAME}"
         )
-    if readme.find(str(primer_scheme.amplicon_size)) == -1:
+    if readme_text.find(str(primer_scheme.amplicon_size)) == -1:
         raise ValueError(
-            f"Amplicon size ({primer_scheme.amplicon_size}) not found in {readme}: {scheme_subpath}"
+            f"Amplicon size ({primer_scheme.amplicon_size}) not found in {README_FILE_NAME}"
         )
-    if readme.find(primer_scheme.version) == -1:
+    if readme_text.find(primer_scheme.primer_scheme_version) == -1:
         raise ValueError(
-            f"Scheme version ({primer_scheme.version}) not found in {readme}: {scheme_subpath}"
+            f"Scheme version ({primer_scheme.primer_scheme_version}) not found in {README_FILE_NAME}"
         )
 
 
@@ -202,19 +229,19 @@ def validate_hashes(
         primer_scheme = PrimerScheme.model_validate_json(infopath.read_text())
 
     scheme_subpath = (
-        Path(primer_scheme.name)
+        Path(primer_scheme.primer_scheme_name)
         / str(primer_scheme.amplicon_size)
-        / primer_scheme.version
+        / primer_scheme.primer_scheme_version
     )
 
-    if not primer_scheme.checksums:
+    if not primer_scheme.primer_scheme_checksums:
         logger.warning(f"No checksums found for {scheme_subpath}")
         return
 
     # Check sha256 hash bedfile
     primer_path = infopath.parent / PRIMER_FILE_NAME
     primer_sha = sha256_checksum(primer_path)
-    if primer_sha != primer_scheme.checksums.primer_sha256:
+    if primer_sha != primer_scheme.primer_scheme_checksums.primer_scheme_sha256:
         logger.warning(
             f"primer.bed sha256 mismatch for {scheme_subpath}. Attempting to normalise and recheck."
         )
@@ -236,7 +263,10 @@ def validate_hashes(
                 f"Failed to normalise primer.bed for {scheme_subpath}: {exc}"
             )
 
-        if reformatted_sha == primer_scheme.checksums.primer_sha256:
+        if (
+            reformatted_sha
+            == primer_scheme.primer_scheme_checksums.primer_scheme_sha256
+        ):
             if fix:
                 BedLineParser.to_file(primer_path, header, bedlines)
                 primer_sha = reformatted_sha
@@ -249,13 +279,13 @@ def validate_hashes(
                 )
         else:
             raise ValueError(
-                f"{PRIMER_FILE_NAME} sha256 ({primer_sha} != info sha256 ({primer_scheme.checksums.primer_sha256}): {scheme_subpath}"
+                f"{PRIMER_FILE_NAME} sha256 ({primer_sha} != info sha256 ({primer_scheme.primer_scheme_checksums.primer_scheme_sha256}): {scheme_subpath}"
             )
 
     # Check sha256 hash ref
     reference_path = infopath.parent / REFERENCE_FILE_NAME
     reference_sha = sha256_checksum(reference_path)
-    if reference_sha != primer_scheme.checksums.reference_sha256:
+    if reference_sha != primer_scheme.primer_scheme_checksums.reference_sequence_sha256:
         logger.warning(
             f"reference.fasta sha256 mismatch for {scheme_subpath}. Attempting to normalise and recheck."
         )
@@ -274,7 +304,10 @@ def validate_hashes(
                 f"Failed to normalise reference.fasta for {scheme_subpath}: {exc}"
             )
 
-        if reformatted_sha == primer_scheme.checksums.reference_sha256:
+        if (
+            reformatted_sha
+            == primer_scheme.primer_scheme_checksums.reference_sequence_sha256
+        ):
             if fix:
                 write_fasta_records(reference_path, reference_records)
                 reference_sha = reformatted_sha
@@ -287,7 +320,7 @@ def validate_hashes(
                 )
         else:
             raise ValueError(
-                f"{REFERENCE_FILE_NAME} sha256 ({reference_sha}) != info sha256 ({primer_scheme.checksums.reference_sha256}): {scheme_subpath}"
+                f"{REFERENCE_FILE_NAME} sha256 ({reference_sha}) != info sha256 ({primer_scheme.primer_scheme_checksums.reference_sequence_sha256}): {scheme_subpath}"
             )
 
 
@@ -318,6 +351,7 @@ def validate(
     if primer_scheme is None:
         primer_scheme = PrimerScheme.model_validate_json(infopath.read_text())
     validate_name(infopath, primer_scheme)
+    validate_identifier(infopath, primer_scheme)
     logger.debug(f"Validated with Pydantic: {infopath}")
 
     # Validate primer + ref

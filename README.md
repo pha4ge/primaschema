@@ -43,7 +43,7 @@ primaschema --show-version
 - `rebuild`: Recompute checksums, regenerate scheme README, and optionally reformat `primer.bed`.
 - `index`: Build or update an `index.json` for a local schemes directory.
 - `get`: Download schemes from an index (default is the PHA4GE primer-schemes index).
-- `modify`: Update contributors, vendors, tags, status, license, target organisms, and algorithm fields.
+- `modify`: Update contributors, vendors, status, license, target organisms, and algorithm fields.
 
 ## Scheme creation
 

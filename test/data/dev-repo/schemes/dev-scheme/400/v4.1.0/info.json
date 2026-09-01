@@ -1,41 +1,41 @@
 {
     "schema_version": "1.0.0a",
-    "name": "artic",
+    "primer_scheme_name": "artic",
     "amplicon_size": 400,
-    "version": "v4.1.0",
-    "contributors": [
+    "primer_scheme_version": "v4.1.0",
+    "primer_scheme_contributor": [
         {
-            "name": "ARTIC network",
-            "orcid_id": "1235678901234",
-            "email": "a@artic.network"
+            "primer_scheme_contributor_name": "ARTIC network",
+            "primer_scheme_contributor_orcid": "1235678901234",
+            "primer_scheme_contributor_email": "a@artic.network"
         }
     ],
-    "target_organisms": [
+    "primer_scheme_target_organism": [
         {
-            "common_name": "sars-cov-2"
+            "primer_scheme_target_organism_name": "sars-cov-2"
         }
     ],
-    "aliases": [
+    "primer_scheme_identifier_alias": [
         "ARTIC/V4.1"
     ],
-    "license": "CC-BY-SA-4.0",
-    "status": "DEPRECATED",
-    "derived_from": "sars-cov-2/artic/400/v4.0.0",
-    "citations": [
+    "primer_scheme_license": "CC-BY-SA-4.0",
+    "primer_scheme_development_status": "DEPRECATED",
+    "primer_scheme_derived_from": "sars-cov-2/artic/400/v4.0.0",
+    "citation": [
         "https://doi.org/10.1101%2F2020.09.04.283077"
     ],
-    "vendors": [
+    "primer_scheme_vendor": [
         {
-            "organisation_name": "IDT",
-            "kit_name": "10011442"
+            "primer_scheme_vendor_name": "IDT",
+            "primer_scheme_vendor_kit_name": "10011442"
         },
         {
-            "organisation_name": "Eurofins",
-            "home_page": "https://eurofinsgenomics.com"
+            "primer_scheme_vendor_name": "Eurofins",
+            "primer_scheme_vendor_url": "https://eurofinsgenomics.com"
         }
     ],
-    "checksums": {
-        "primer_sha256": "6640cd47ce429efbf074d646f002ff495939934121dfb2dd78a925da2d1e6036",
-        "reference_sha256": "b74b271645e893a879172021e14db7133dba85724cb1907a92628a359cb732ba"
+    "primer_scheme_checksums": {
+        "primer_scheme_sha256": "6640cd47ce429efbf074d646f002ff495939934121dfb2dd78a925da2d1e6036",
+        "reference_sequence_sha256": "b74b271645e893a879172021e14db7133dba85724cb1907a92628a359cb732ba"
     }
 }

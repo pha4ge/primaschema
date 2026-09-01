@@ -1,0 +1,98 @@
+# test-midnight 1200bp v2.0.0
+
+![Generic badge](https://img.shields.io/badge/STATUS-DEPRECATED-red.svg)
+
+> If you use this scheme please cite: https://dx.doi.org/10.17504/protocols.io.bwyppfvn
+
+## Notes
+
+Accomodates Omicron BA.1 with single primer addition
+
+https://twitter.com/freed_nikki/status/1464477522448433156
+
+Not considered a new version by Freed et al. and IDT despite additional primer
+
+Definition: https://github.com/pha4ge/primer-schemes/tree/main/sars-cov-2/midnight/v2
+
+## Metadata
+
+**Target Organisms:**
+- SARS-CoV-2 (Tax ID: 2697049)
+
+**Derived from:** test-midnight/1200/v1.0.0
+
+## Contributors
+
+- Nikki Freed
+- Olin Silander
+
+## Vendors
+
+- Oxford Nanopore Technologies: MRT001.20
+
+## Overviews
+
+<div style="width: 100%;"><img src="assets/primer.svg" style="width: 100%;" alt="Click to see the source"></div>
+
+## Details
+
+```json
+{
+    "schema_version": "1.0.0-alpha",
+    "primer_scheme_name": "test-midnight",
+    "amplicon_size": 1200,
+    "primer_scheme_version": "v2.0.0",
+    "primer_scheme_identifier": "test-midnight/1200/v2.0.0",
+    "primer_scheme_contributor": [
+        {
+            "primer_scheme_contributor_name": "Nikki Freed"
+        },
+        {
+            "primer_scheme_contributor_name": "Olin Silander"
+        }
+    ],
+    "primer_scheme_target_organism": [
+        {
+            "primer_scheme_target_organism_name": "SARS-CoV-2",
+            "primer_scheme_target_organism_ncbi_taxon_id": "2697049"
+        }
+    ],
+    "primer_scheme_identifier_alias": [
+        "midnight-ont-v2",
+        "midnight-idt-v1",
+        "Midnight-ONT/V2"
+    ],
+    "primer_scheme_license": "CC-BY-4.0",
+    "primer_scheme_development_status": "DEPRECATED",
+    "primer_scheme_derived_from": "test-midnight/1200/v1.0.0",
+    "citation": [
+        "https://dx.doi.org/10.17504/protocols.io.bwyppfvn"
+    ],
+    "primer_scheme_details": [
+        "Accomodates Omicron BA.1 with single primer addition",
+        "https://twitter.com/freed_nikki/status/1464477522448433156",
+        "Not considered a new version by Freed et al. and IDT despite additional primer",
+        "Definition: https://github.com/pha4ge/primer-schemes/tree/main/sars-cov-2/midnight/v2"
+    ],
+    "primer_scheme_vendor": [
+        {
+            "primer_scheme_vendor_name": "Oxford Nanopore Technologies",
+            "primer_scheme_vendor_kit_name": "MRT001.20"
+        }
+    ],
+    "primer_scheme_checksums": {
+        "primer_scheme_sha256": "e48d23b772a7c89826b74efcd55ab07ccc586ad95ee13260ff7772db1320df7a",
+        "reference_sequence_sha256": "4e43298c083d3da7bfbab890e351e3e58015f9bd7fac1bdee097d11ac89f785d"
+    },
+    "primer_scheme_creation_date": "2021-12-01",
+    "primer_scheme_submission_date": "2026-07-24"
+}
+```
+
+
+
+------------------------------------------------------------------------
+
+This work is licensed under a [Creative Commons Attribution 4.0 International License](http://creativecommons.org/licenses/by/4.0/).
+
+![](https://i.creativecommons.org/l/by/4.0/88x31.png)

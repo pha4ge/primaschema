@@ -5,7 +5,7 @@ from pathlib import Path
 import dnaio
 
 from primaschema import METADATA_FILE_NAME
-from primaschema.schema.info import PrimerScheme
+from primaschema.schema.primer_scheme import PrimerScheme
 
 
 def sha256_checksum(filename: Path):
@@ -108,3 +108,32 @@ def find_all_info_json(primer_schemes_path: Path):
         List of paths to info.json files.
     """
     return list(primer_schemes_path.rglob(f"*/{METADATA_FILE_NAME}"))
+
+
+def ensure_path_within(base: Path, target: Path) -> Path:
+    """Resolve `target` and verify it is `base` itself or a descendant of it.
+
+    Defense-in-depth check before writing scheme files: the directory path
+    is built by joining `base` with name/version fields that ultimately
+    come from user CLI input or a remote/downloaded index, and are only
+    otherwise constrained by field-level pattern validation. This guards
+    against any value - now, or via a future field - that could resolve
+    outside the intended output directory.
+
+    Args:
+        base: The intended root directory that `target` must stay within.
+        target: The path to check, typically built from untrusted fields.
+
+    Returns:
+        The resolved (absolute, symlink-free) form of `target`.
+
+    Raises:
+        ValueError: If `target` would resolve outside of `base`.
+    """
+    resolved_base = base.resolve()
+    resolved_target = target.resolve()
+    if not resolved_target.is_relative_to(resolved_base):
+        raise ValueError(
+            f"Refusing to write outside {resolved_base}: resolved path is {resolved_target}"
+        )
+    return resolved_target

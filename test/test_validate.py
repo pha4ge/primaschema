@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 
 import primaschema.validate as validate_module
-from primaschema.schema.info import PrimerScheme
+from primaschema.schema.primer_scheme import PrimerScheme
 
 DATA_DIR = Path("test/data")
 
@@ -37,7 +37,7 @@ def test_validate_linkml_rejects_missing_required_field(tmp_path: Path):
     info_path = scheme_dir / "info.json"
 
     data = json.loads(info_path.read_text())
-    data.pop("name", None)
+    data.pop("primer_scheme_name", None)
     info_path.write_text(json.dumps(data))
 
     with pytest.raises(ValueError):
@@ -68,6 +68,43 @@ def test_validate_name_mismatch_raises(tmp_path: Path):
 
     with pytest.raises(ValueError):
         validate_module.validate_name(info_path)
+
+
+def test_validate_identifier_absent_does_not_raise(tmp_path: Path):
+    """validate_identifier is a no-op when the file has no stored identifier."""
+    scheme_dir = _copy_scheme(tmp_path)
+    info_path = scheme_dir / "info.json"
+
+    data = json.loads(info_path.read_text())
+    data.pop("primer_scheme_identifier", None)
+    info_path.write_text(json.dumps(data))
+
+    validate_module.validate_identifier(info_path)
+
+
+def test_validate_identifier_correct_does_not_raise(tmp_path: Path):
+    """validate_identifier passes when the stored identifier matches the computed one."""
+    scheme_dir = _copy_scheme(tmp_path)
+    info_path = scheme_dir / "info.json"
+
+    data = json.loads(info_path.read_text())
+    data["primer_scheme_identifier"] = "test/400/v2.0.0"
+    info_path.write_text(json.dumps(data))
+
+    validate_module.validate_identifier(info_path)
+
+
+def test_validate_identifier_wrong_raises(tmp_path: Path):
+    """validate_identifier raises when the stored identifier disagrees with the computed one."""
+    scheme_dir = _copy_scheme(tmp_path)
+    info_path = scheme_dir / "info.json"
+
+    data = json.loads(info_path.read_text())
+    data["primer_scheme_identifier"] = "wrong/identifier/here"
+    info_path.write_text(json.dumps(data))
+
+    with pytest.raises(ValueError):
+        validate_module.validate_identifier(info_path)
 
 
 def test_validate_readme_missing_raises(tmp_path: Path):
@@ -117,7 +154,7 @@ def test_create_range_infos_all_pass_linkml(tmp_path: Path):
             "version": "v1.0.0",
             "status": "DRAFT",
             "license": "CC0-1.0",
-            "target_organism": "common_name=SARS-CoV-2,ncbi_tax_id=2697049",
+            "target_organism": "primer_scheme_target_organism_name=SARS-CoV-2,primer_scheme_target_organism_ncbi_taxon_id=2697049",
         },
         {
             "name": "batch-validate-b",
@@ -125,7 +162,7 @@ def test_create_range_infos_all_pass_linkml(tmp_path: Path):
             "version": "v1.1.0",
             "status": "TESTED",
             "license": "CC-BY-4.0",
-            "target_organism": "common_name=Influenza A,ncbi_tax_id=11320",
+            "target_organism": "primer_scheme_target_organism_name=Influenza A,primer_scheme_target_organism_ncbi_taxon_id=11320",
         },
         {
             "name": "batch-validate-c",
@@ -133,7 +170,7 @@ def test_create_range_infos_all_pass_linkml(tmp_path: Path):
             "version": "v2.0.0",
             "status": "VALIDATED",
             "license": "CC-BY-SA-4.0",
-            "target_organism": "common_name=Mpox virus,ncbi_tax_id=10244",
+            "target_organism": "primer_scheme_target_organism_name=Mpox virus,primer_scheme_target_organism_ncbi_taxon_id=10244",
         },
         {
             "name": "batch-validate-d",
@@ -141,7 +178,7 @@ def test_create_range_infos_all_pass_linkml(tmp_path: Path):
             "version": "v3.0.0",
             "status": "DEPRECATED",
             "license": "CC-BY-NC-ND-4.0",
-            "target_organism": "common_name=Dengue virus,ncbi_tax_id=12637",
+            "target_organism": "primer_scheme_target_organism_name=Dengue virus,primer_scheme_target_organism_ncbi_taxon_id=12637",
         },
     ]
 
@@ -152,21 +189,21 @@ def test_create_range_infos_all_pass_linkml(tmp_path: Path):
                 "run",
                 "primaschema",
                 "create",
-                "--name",
+                "--primer-scheme-name",
                 case["name"],
                 "--amplicon-size",
                 case["amplicon_size"],
-                "--version",
+                "--primer-scheme-version",
                 case["version"],
-                "--contributors",
-                "name=Validation Bot,email=validation@example.org",
-                "--target-organisms",
+                "--contributor",
+                "primer_scheme_contributor_name=Validation Bot,primer_scheme_contributor_email=validation@example.org",
+                "--target-organism",
                 case["target_organism"],
-                "--status",
+                "--primer-scheme-development-status",
                 case["status"],
-                "--license",
+                "--primer-scheme-license",
                 case["license"],
-                "--date-created",
+                "--primer-scheme-creation-date",
                 "2024-01-01",
                 "--bed-path",
                 str(bed_path),
