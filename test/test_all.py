@@ -326,10 +326,12 @@ def test_primer_scheme_dates_accept_valid():
     assert ps.primer_scheme_submission_date == date(2024, 6, 1)
 
 
-def test_cli_scheme_date_created_required():
-    """CLIPrimerScheme raises ValidationError when date_created is omitted."""
-    from pydantic import ValidationError
+def test_cli_scheme_date_created_optional():
+    """CLIPrimerScheme leaves date_created unset, matching the schema.
 
+    The CLI used to retype the slot as a required `date`, enforcing a
+    constraint info.yml doesn't have.
+    """
     from primaschema.cli import CLIPrimerScheme
     from primaschema.schema.info import (
         PrimerSchemeContributor,
@@ -337,22 +339,21 @@ def test_cli_scheme_date_created_required():
         PrimerSchemeTargetOrganism,
     )
 
-    with pytest.raises(ValidationError):
-        CLIPrimerScheme(
-            schema_version="1.0.0",
-            primer_scheme_name="test",
-            amplicon_size=400,
-            primer_scheme_version="v1.0.0",
-            primer_scheme_development_status=PrimerSchemeDevelopmentStatus.DRAFT,
-            primer_scheme_contributor=[
-                PrimerSchemeContributor(primer_scheme_contributor_name="Alice")
-            ],
-            primer_scheme_target_organism=[
-                PrimerSchemeTargetOrganism(
-                    primer_scheme_target_organism_name="SARS-CoV-2"
-                )
-            ],
-        )
+    cli_ps = CLIPrimerScheme(
+        schema_version="1.0.0",
+        primer_scheme_name="test",
+        amplicon_size=400,
+        primer_scheme_version="v1.0.0",
+        primer_scheme_development_status=PrimerSchemeDevelopmentStatus.DRAFT,
+        primer_scheme_contributor=[
+            PrimerSchemeContributor(primer_scheme_contributor_name="Alice")
+        ],
+        primer_scheme_target_organism=[
+            PrimerSchemeTargetOrganism(primer_scheme_target_organism_name="SARS-CoV-2")
+        ],
+    )
+    assert cli_ps.primer_scheme_creation_date is None
+    assert PrimerScheme.model_validate(cli_ps.model_dump()) is not None
 
 
 def test_cli_scheme_date_added_defaults_to_today():

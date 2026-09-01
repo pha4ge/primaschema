@@ -553,10 +553,6 @@ class CLIPrimerScheme(PrimerScheme):
             help="The range of targets the primer scheme is intended for. Repeat the flag for multiple values.",
         ),
     ] = None
-    primer_scheme_creation_date: Annotated[
-        date,
-        Parameter(help="Date the primer scheme was originally created by its authors"),
-    ]
     primer_scheme_submission_date: Annotated[
         date,
         Parameter(help="Date the scheme was added to this registry [default: today]"),
