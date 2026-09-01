@@ -46,13 +46,13 @@ from primaschema.schema.index import (
     update_index,
 )
 from primaschema.schema.info import (
-    PrimerSchemeGenerator,
+    PrimerSchemeApplication,
     PrimerSchemeChecksums,
     PrimerSchemeContributor,
-    PrimerSchemeApplication,
+    PrimerSchemeDevelopmentStatus,
+    PrimerSchemeGenerator,
     PrimerSchemeLicense,
     PrimerSchemeScope,
-    PrimerSchemeDevelopmentStatus,
     PrimerSchemeTargetOrganism,
     PrimerSchemeVendor,
 )
@@ -538,11 +538,20 @@ class CLIPrimerScheme(PrimerScheme):
     # show_default=False: cyclopts' Enum default-rendering assumes a non-None
     # member (`default.name`), which crashes --help for an Optional[Enum]
     # whose default is None. Neither field has a meaningful default to show.
+    # Both are multivalued: repeat the flag to supply more than one value.
     primer_scheme_application: Annotated[
-        Optional[PrimerSchemeApplication], Parameter(show_default=False)
+        Optional[List[PrimerSchemeApplication]],
+        Parameter(
+            show_default=False,
+            help="The application(s) the primer scheme was intended for. Repeat the flag for multiple values.",
+        ),
     ] = None
     primer_scheme_scope: Annotated[
-        Optional[PrimerSchemeScope], Parameter(show_default=False)
+        Optional[List[PrimerSchemeScope]],
+        Parameter(
+            show_default=False,
+            help="The range of targets the primer scheme is intended for. Repeat the flag for multiple values.",
+        ),
     ] = None
     primer_scheme_creation_date: Annotated[
         date,

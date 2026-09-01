@@ -246,13 +246,17 @@ slots:
       - license
   primer_scheme_application:
     slot_uri: GENEPIO:0102309
-    description: "The application the primer scheme was intended for."
+    description: "The applications the primer scheme was intended for."
     range: PrimerSchemeApplication
     required: false
+    multivalued: true
+    inlined_as_list: true
   primer_scheme_scope:
     description: "The range of targets the primer scheme is intented for."
     range: PrimerSchemeScope
     required: false
+    multivalued: true
+    inlined_as_list: true
   citation:
     slot_uri: IAO:0000301
     description: "A textual entity intended to identify a particular publication."
