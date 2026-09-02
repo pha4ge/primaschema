@@ -131,7 +131,14 @@ def cli_launcher(
         raise SystemExit(1) from None
 
 
-modify_app = App(name="modify", help="Modify fields of an existing primer scheme")
+# version_flags mirrors the root app: without it Cyclopts keeps its default
+# `--version` on every subcommand, which both reports Cyclopts' own version
+# and shadows a parameter legitimately named `--version`.
+modify_app = App(
+    name="modify",
+    help="Modify fields of an existing primer scheme",
+    version_flags="--show-version",
+)
 app.command(modify_app)
 
 
