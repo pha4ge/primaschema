@@ -398,7 +398,7 @@ def generate_readme(path: pathlib.Path, primer_scheme: PrimerScheme):
             readme.write(footer)
 
 
-def parse_algorithm(v: Any) -> Optional[PrimerSchemeGenerator]:
+def parse_generator(v: Any) -> Optional[PrimerSchemeGenerator]:
     if v is None:
         return None
     if isinstance(v, PrimerSchemeGenerator):
@@ -413,7 +413,7 @@ def parse_algorithm(v: Any) -> Optional[PrimerSchemeGenerator]:
                 primer_scheme_generator_version=version,
             )
         return PrimerSchemeGenerator(primer_scheme_generator_name=v)
-    raise ValueError(f"Cannot parse algorithm: {v}")
+    raise ValueError(f"Cannot parse generator: {v}")
 
 
 def parse_target_organism_single(v: Any) -> PrimerSchemeTargetOrganism:
@@ -631,19 +631,19 @@ def create(
             help="The path to the primer schemes directory. Will use the ENV VAR PRIMER_SCHEMES_PATH",
         ),
     ],
-    algorithm: Annotated[
+    generator: Annotated[
         Optional[str],
         Parameter(
-            help="The algorithm used to generate the scheme (e.g. primalscheme:3.0.3)"
+            help="The generator used to create the scheme (e.g. primalscheme:3.0.3)"
         ),
     ] = None,
 ):
     """Create a new primer scheme definition"""
-    # Parse algorithm if provided
-    if algorithm:
-        cli_ps.primer_scheme_generator = parse_algorithm(algorithm)
+    # Parse generator if provided
+    if generator:
+        cli_ps.primer_scheme_generator = parse_generator(generator)
         logger.debug(
-            f"Parsed algorithm '{algorithm}' -> PrimerSchemeGenerator({cli_ps.primer_scheme_generator})"
+            f"Parsed generator '{generator}' -> PrimerSchemeGenerator({cli_ps.primer_scheme_generator})"
         )
 
     # Convert to base PrimerScheme to ensure strict adherence to the schema
@@ -1062,24 +1062,24 @@ def add_target_organism(
 
 
 @modify_app.command
-def update_algorithm(
+def update_generator(
     info_path: Annotated[
         pathlib.Path,
         Parameter(validator=validators.Path(exists=True, file_okay=True)),
     ],
-    algorithm: PrimerSchemeGenerator,
+    generator: PrimerSchemeGenerator,
 ):
-    """Update the algorithm."""
+    """Update the generator."""
     ps = PrimerScheme.model_validate_json(info_path.read_text())
     scheme_label = (
         f"{ps.primer_scheme_name}/{ps.amplicon_size}/{ps.primer_scheme_version}"
     )
     previous = ps.primer_scheme_generator
     logger.debug(f"Loaded scheme {scheme_label} from {info_path}")
-    logger.debug(f"Updating algorithm: {previous} -> {algorithm}")
-    ps.primer_scheme_generator = algorithm
+    logger.debug(f"Updating generator: {previous} -> {generator}")
+    ps.primer_scheme_generator = generator
     _save_and_rebuild_readme(info_path, ps)
-    logger.info(f"Updated algorithm for {scheme_label}: {previous} -> {algorithm}")
+    logger.info(f"Updated generator for {scheme_label}: {previous} -> {generator}")
 
 
 # Index commands
