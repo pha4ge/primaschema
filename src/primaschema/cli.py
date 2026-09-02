@@ -69,6 +69,7 @@ from primaschema.util import (
     sha256_checksum,
     write_fasta_records,
 )
+from primaschema.validate import ValidationChecks
 from primaschema.validate import validate as validate_scheme
 
 logger = logging.getLogger(__name__)
@@ -1230,6 +1231,17 @@ def validate(
     all: bool = False,
     additional_linkml: bool = False,
     strict: bool = True,
+    checks: Annotated[
+        ValidationChecks,
+        Parameter(
+            help=(
+                "How much of the scheme directory to check: 'info' for info.json alone, "
+                "'core' to add primer.bed, reference.fasta and the checksums, "
+                "'full' to also require README.md. Use 'core' for a scheme fetched with "
+                "`get`, which does not download the generated README.md"
+            ),
+        ),
+    ] = ValidationChecks.FULL,
     fix: Annotated[
         bool,
         Parameter(
@@ -1255,6 +1267,7 @@ def validate(
                     additional_linkml,
                     strict,
                     fix=fix,
+                    checks=checks,
                 )
                 logger.info(f"Validated scheme {scheme_label}")
             except Exception as exc:
@@ -1276,6 +1289,7 @@ def validate(
             additional_linkml,
             strict,
             fix=fix,
+            checks=checks,
         )
         logger.info(f"Validated scheme {scheme_label}")
 
