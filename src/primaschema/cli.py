@@ -46,13 +46,13 @@ from primaschema.schema.index import (
     update_index,
 )
 from primaschema.schema.info import (
-    PrimerSchemeGenerator,
+    PrimerSchemeApplication,
     PrimerSchemeChecksums,
     PrimerSchemeContributor,
-    PrimerSchemeApplication,
+    PrimerSchemeDevelopmentStatus,
+    PrimerSchemeGenerator,
     PrimerSchemeLicense,
     PrimerSchemeScope,
-    PrimerSchemeDevelopmentStatus,
     PrimerSchemeTargetOrganism,
     PrimerSchemeVendor,
 )
@@ -69,6 +69,7 @@ from primaschema.util import (
     sha256_checksum,
     write_fasta_records,
 )
+from primaschema.validate import ValidationChecks
 from primaschema.validate import validate as validate_scheme
 
 logger = logging.getLogger(__name__)
@@ -131,7 +132,14 @@ def cli_launcher(
         raise SystemExit(1) from None
 
 
-modify_app = App(name="modify", help="Modify fields of an existing primer scheme")
+# version_flags mirrors the root app: without it Cyclopts keeps its default
+# `--version` on every subcommand, which both reports Cyclopts' own version
+# and shadows a parameter legitimately named `--version`.
+modify_app = App(
+    name="modify",
+    help="Modify fields of an existing primer scheme",
+    version_flags="--show-version",
+)
 app.command(modify_app)
 
 
@@ -391,7 +399,7 @@ def generate_readme(path: pathlib.Path, primer_scheme: PrimerScheme):
             readme.write(footer)
 
 
-def parse_algorithm(v: Any) -> Optional[PrimerSchemeGenerator]:
+def parse_generator(v: Any) -> Optional[PrimerSchemeGenerator]:
     if v is None:
         return None
     if isinstance(v, PrimerSchemeGenerator):
@@ -406,7 +414,7 @@ def parse_algorithm(v: Any) -> Optional[PrimerSchemeGenerator]:
                 primer_scheme_generator_version=version,
             )
         return PrimerSchemeGenerator(primer_scheme_generator_name=v)
-    raise ValueError(f"Cannot parse algorithm: {v}")
+    raise ValueError(f"Cannot parse generator: {v}")
 
 
 def parse_target_organism_single(v: Any) -> PrimerSchemeTargetOrganism:
@@ -486,6 +494,32 @@ def _normalize_license(v: Any) -> Any:
 
 _FIELD_PREFIX = "primer_scheme_"
 
+# Field-name prefix carried by each object-valued model. Stripping it keeps the
+# flags typeable while the full name survives as an alias.
+_MODEL_FIELD_PREFIXES = {
+    PrimerSchemeContributor: "primer_scheme_contributor_",
+    PrimerSchemeGenerator: "primer_scheme_generator_",
+    PrimerSchemeTargetOrganism: "primer_scheme_target_organism_",
+    PrimerSchemeVendor: "primer_scheme_vendor_",
+}
+
+
+def _make_strip_prefix_name_transform(prefix: str):
+    """Build a Cyclopts name_transform that drops `prefix` from flag names."""
+
+    def name_transform(name: str) -> str:
+        if name.startswith(prefix):
+            name = name[len(prefix) :]
+        return default_name_transform(name)
+
+    return name_transform
+
+
+_NAME_TRANSFORMS = {
+    model: _make_strip_prefix_name_transform(prefix)
+    for model, prefix in _MODEL_FIELD_PREFIXES.items()
+}
+
 
 def _strip_field_prefix_name_transform(name: str) -> str:
     """Strip the redundant 'primer_scheme_' prefix from CLI flag names.
@@ -538,16 +572,21 @@ class CLIPrimerScheme(PrimerScheme):
     # show_default=False: cyclopts' Enum default-rendering assumes a non-None
     # member (`default.name`), which crashes --help for an Optional[Enum]
     # whose default is None. Neither field has a meaningful default to show.
+    # Both are multivalued: repeat the flag to supply more than one value.
     primer_scheme_application: Annotated[
-        Optional[PrimerSchemeApplication], Parameter(show_default=False)
+        Optional[List[PrimerSchemeApplication]],
+        Parameter(
+            show_default=False,
+            help="The application(s) the primer scheme was intended for. Repeat the flag for multiple values.",
+        ),
     ] = None
     primer_scheme_scope: Annotated[
-        Optional[PrimerSchemeScope], Parameter(show_default=False)
+        Optional[List[PrimerSchemeScope]],
+        Parameter(
+            show_default=False,
+            help="The range of targets the primer scheme is intended for. Repeat the flag for multiple values.",
+        ),
     ] = None
-    primer_scheme_creation_date: Annotated[
-        date,
-        Parameter(help="Date the primer scheme was originally created by its authors"),
-    ]
     primer_scheme_submission_date: Annotated[
         date,
         Parameter(help="Date the scheme was added to this registry [default: today]"),
@@ -581,14 +620,16 @@ class CLIPrimerScheme(PrimerScheme):
 
 
 # Keep the full `--primer-scheme-*` flag as a working alias alongside the
-# shortened name produced by _strip_field_prefix_name_transform, so existing
-# scripts/docs written against the full flag names keep working.
-for _field_name, _field_info in CLIPrimerScheme.model_fields.items():
-    if _field_name.startswith(_FIELD_PREFIX):
-        _field_info.metadata.append(
-            Parameter(alias="--" + _field_name.replace("_", "-"))
-        )
-del _field_name, _field_info
+# shortened name produced by the name_transforms above, so every parameter is
+# reachable as both `--derived-from` and `--primer-scheme-derived-from`, and
+# existing scripts/docs written against the full flag names keep working.
+for _model in (CLIPrimerScheme, *_MODEL_FIELD_PREFIXES):
+    for _field_name, _field_info in _model.model_fields.items():
+        if _field_name.startswith(_FIELD_PREFIX):
+            _field_info.metadata.append(
+                Parameter(alias="--" + _field_name.replace("_", "-"))
+            )
+del _model, _field_name, _field_info
 
 
 @app.command
@@ -619,19 +660,22 @@ def create(
             help="The path to the primer schemes directory. Will use the ENV VAR PRIMER_SCHEMES_PATH",
         ),
     ],
-    algorithm: Annotated[
+    generator: Annotated[
         Optional[str],
         Parameter(
-            help="The algorithm used to generate the scheme (e.g. primalscheme:3.0.3)"
+            # Backs the primer_scheme_generator slot, so it carries the same
+            # full-name alias the model-derived flags get from the loop above.
+            alias="--primer-scheme-generator",
+            help="The generator used to create the scheme (e.g. primalscheme:3.0.3)",
         ),
     ] = None,
 ):
     """Create a new primer scheme definition"""
-    # Parse algorithm if provided
-    if algorithm:
-        cli_ps.primer_scheme_generator = parse_algorithm(algorithm)
+    # Parse generator if provided
+    if generator:
+        cli_ps.primer_scheme_generator = parse_generator(generator)
         logger.debug(
-            f"Parsed algorithm '{algorithm}' -> PrimerSchemeGenerator({cli_ps.primer_scheme_generator})"
+            f"Parsed generator '{generator}' -> PrimerSchemeGenerator({cli_ps.primer_scheme_generator})"
         )
 
     # Convert to base PrimerScheme to ensure strict adherence to the schema
@@ -709,7 +753,11 @@ def add_contributor(
     ],
     contributor: Annotated[
         PrimerSchemeContributor,
-        Parameter(name="*", converter=parse_contributor_single),
+        Parameter(
+            name="*",
+            converter=parse_contributor_single,
+            name_transform=_NAME_TRANSFORMS[PrimerSchemeContributor],
+        ),
     ],
     idx: Annotated[None | int, Parameter(validator=validators.Number(gte=0))] = None,
 ):
@@ -781,7 +829,11 @@ def update_contributor(
     idx: Annotated[int, Parameter(validator=validators.Number(gte=0))],
     contributor: Annotated[
         PrimerSchemeContributor,
-        Parameter(name="*", converter=parse_contributor_single),
+        Parameter(
+            name="*",
+            converter=parse_contributor_single,
+            name_transform=_NAME_TRANSFORMS[PrimerSchemeContributor],
+        ),
     ],
 ):
     """Update a contributor at a specific index."""
@@ -812,7 +864,11 @@ def add_vendor(
     ],
     vendor: Annotated[
         PrimerSchemeVendor,
-        Parameter(name="*", converter=parse_vendor_single),
+        Parameter(
+            name="*",
+            converter=parse_vendor_single,
+            name_transform=_NAME_TRANSFORMS[PrimerSchemeVendor],
+        ),
     ],
     idx: Annotated[None | int, Parameter(validator=validators.Number(gte=0))] = None,
 ):
@@ -878,7 +934,11 @@ def update_vendor(
     idx: Annotated[int, Parameter(validator=validators.Number(gte=0))],
     vendor: Annotated[
         PrimerSchemeVendor,
-        Parameter(name="*", converter=parse_vendor_single),
+        Parameter(
+            name="*",
+            converter=parse_vendor_single,
+            name_transform=_NAME_TRANSFORMS[PrimerSchemeVendor],
+        ),
     ],
 ):
     """Update a vendor at a specific index."""
@@ -908,7 +968,10 @@ def update_license(
     ],
     license: Annotated[
         _LicenseLiteral,
-        Parameter(converter=_normalize_license),
+        Parameter(
+            alias="--primer-scheme-license",
+            converter=_normalize_license,
+        ),
     ],
 ):
     """Update the scheme license."""
@@ -930,7 +993,10 @@ def update_status(
         pathlib.Path,
         Parameter(validator=validators.Path(exists=True, file_okay=True)),
     ],
-    status: PrimerSchemeDevelopmentStatus,
+    development_status: Annotated[
+        PrimerSchemeDevelopmentStatus,
+        Parameter(alias="--primer-scheme-development-status"),
+    ],
 ):
     """Update the scheme status."""
     ps = PrimerScheme.model_validate_json(info_path.read_text())
@@ -939,10 +1005,12 @@ def update_status(
     )
     previous = ps.primer_scheme_development_status
     logger.debug(f"Loaded scheme {scheme_label} from {info_path}")
-    logger.debug(f"Updating status: {previous} -> {status}")
-    ps.primer_scheme_development_status = status
+    logger.debug(f"Updating status: {previous} -> {development_status}")
+    ps.primer_scheme_development_status = development_status
     _save_and_rebuild_readme(info_path, ps)
-    logger.info(f"Updated status for {scheme_label}: {previous} -> {status}")
+    logger.info(
+        f"Updated status for {scheme_label}: {previous} -> {development_status}"
+    )
 
 
 @modify_app.command
@@ -951,14 +1019,14 @@ def update_date_created(
         pathlib.Path,
         Parameter(validator=validators.Path(exists=True, file_okay=True)),
     ],
-    date_created: date,
+    creation_date: Annotated[date, Parameter(alias="--primer-scheme-creation-date")],
 ):
     """Update the date the primer scheme was originally created."""
     ps = PrimerScheme.model_validate_json(info_path.read_text())
     previous = ps.primer_scheme_creation_date
-    ps.primer_scheme_creation_date = date_created
+    ps.primer_scheme_creation_date = creation_date
     _save_and_rebuild_readme(info_path, ps)
-    logger.info(f"Updated date_created: {previous} -> {date_created}")
+    logger.info(f"Updated creation_date: {previous} -> {creation_date}")
 
 
 @modify_app.command
@@ -967,14 +1035,16 @@ def update_date_added(
         pathlib.Path,
         Parameter(validator=validators.Path(exists=True, file_okay=True)),
     ],
-    date_added: date,
+    submission_date: Annotated[
+        date, Parameter(alias="--primer-scheme-submission-date")
+    ],
 ):
     """Update the date the scheme was added to the registry."""
     ps = PrimerScheme.model_validate_json(info_path.read_text())
     previous = ps.primer_scheme_submission_date
-    ps.primer_scheme_submission_date = date_added
+    ps.primer_scheme_submission_date = submission_date
     _save_and_rebuild_readme(info_path, ps)
-    logger.info(f"Updated date_added: {previous} -> {date_added}")
+    logger.info(f"Updated submission_date: {previous} -> {submission_date}")
 
 
 @modify_app.command
@@ -1019,7 +1089,11 @@ def add_target_organism(
         Parameter(validator=validators.Path(exists=True, file_okay=True)),
     ],
     target_organism: Annotated[
-        Optional[PrimerSchemeTargetOrganism], Parameter(name="*")
+        Optional[PrimerSchemeTargetOrganism],
+        Parameter(
+            name="*",
+            name_transform=_NAME_TRANSFORMS[PrimerSchemeTargetOrganism],
+        ),
     ] = None,
     idx: Annotated[None | int, Parameter(validator=validators.Number(gte=0))] = None,
 ):
@@ -1050,24 +1124,30 @@ def add_target_organism(
 
 
 @modify_app.command
-def update_algorithm(
+def update_generator(
     info_path: Annotated[
         pathlib.Path,
         Parameter(validator=validators.Path(exists=True, file_okay=True)),
     ],
-    algorithm: PrimerSchemeGenerator,
+    generator: Annotated[
+        PrimerSchemeGenerator,
+        Parameter(
+            name="*",
+            name_transform=_NAME_TRANSFORMS[PrimerSchemeGenerator],
+        ),
+    ],
 ):
-    """Update the algorithm."""
+    """Update the generator."""
     ps = PrimerScheme.model_validate_json(info_path.read_text())
     scheme_label = (
         f"{ps.primer_scheme_name}/{ps.amplicon_size}/{ps.primer_scheme_version}"
     )
     previous = ps.primer_scheme_generator
     logger.debug(f"Loaded scheme {scheme_label} from {info_path}")
-    logger.debug(f"Updating algorithm: {previous} -> {algorithm}")
-    ps.primer_scheme_generator = algorithm
+    logger.debug(f"Updating generator: {previous} -> {generator}")
+    ps.primer_scheme_generator = generator
     _save_and_rebuild_readme(info_path, ps)
-    logger.info(f"Updated algorithm for {scheme_label}: {previous} -> {algorithm}")
+    logger.info(f"Updated generator for {scheme_label}: {previous} -> {generator}")
 
 
 # Index commands
@@ -1151,6 +1231,17 @@ def validate(
     all: bool = False,
     additional_linkml: bool = False,
     strict: bool = True,
+    checks: Annotated[
+        ValidationChecks,
+        Parameter(
+            help=(
+                "How much of the scheme directory to check: 'info' for info.json alone, "
+                "'core' to add primer.bed, reference.fasta and the checksums, "
+                "'full' to also require README.md. Use 'core' for a scheme fetched with "
+                "`get`, which does not download the generated README.md"
+            ),
+        ),
+    ] = ValidationChecks.FULL,
     fix: Annotated[
         bool,
         Parameter(
@@ -1176,6 +1267,7 @@ def validate(
                     additional_linkml,
                     strict,
                     fix=fix,
+                    checks=checks,
                 )
                 logger.info(f"Validated scheme {scheme_label}")
             except Exception as exc:
@@ -1197,6 +1289,7 @@ def validate(
             additional_linkml,
             strict,
             fix=fix,
+            checks=checks,
         )
         logger.info(f"Validated scheme {scheme_label}")
 

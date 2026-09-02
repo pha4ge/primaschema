@@ -326,10 +326,12 @@ def test_primer_scheme_dates_accept_valid():
     assert ps.primer_scheme_submission_date == date(2024, 6, 1)
 
 
-def test_cli_scheme_date_created_required():
-    """CLIPrimerScheme raises ValidationError when date_created is omitted."""
-    from pydantic import ValidationError
+def test_cli_scheme_date_created_optional():
+    """CLIPrimerScheme leaves date_created unset, matching the schema.
 
+    The CLI used to retype the slot as a required `date`, enforcing a
+    constraint info.yml doesn't have.
+    """
     from primaschema.cli import CLIPrimerScheme
     from primaschema.schema.info import (
         PrimerSchemeContributor,
@@ -337,22 +339,21 @@ def test_cli_scheme_date_created_required():
         PrimerSchemeTargetOrganism,
     )
 
-    with pytest.raises(ValidationError):
-        CLIPrimerScheme(
-            schema_version="1.0.0",
-            primer_scheme_name="test",
-            amplicon_size=400,
-            primer_scheme_version="v1.0.0",
-            primer_scheme_development_status=PrimerSchemeDevelopmentStatus.DRAFT,
-            primer_scheme_contributor=[
-                PrimerSchemeContributor(primer_scheme_contributor_name="Alice")
-            ],
-            primer_scheme_target_organism=[
-                PrimerSchemeTargetOrganism(
-                    primer_scheme_target_organism_name="SARS-CoV-2"
-                )
-            ],
-        )
+    cli_ps = CLIPrimerScheme(
+        schema_version="1.0.0",
+        primer_scheme_name="test",
+        amplicon_size=400,
+        primer_scheme_version="v1.0.0",
+        primer_scheme_development_status=PrimerSchemeDevelopmentStatus.DRAFT,
+        primer_scheme_contributor=[
+            PrimerSchemeContributor(primer_scheme_contributor_name="Alice")
+        ],
+        primer_scheme_target_organism=[
+            PrimerSchemeTargetOrganism(primer_scheme_target_organism_name="SARS-CoV-2")
+        ],
+    )
+    assert cli_ps.primer_scheme_creation_date is None
+    assert PrimerScheme.model_validate(cli_ps.model_dump()) is not None
 
 
 def test_cli_scheme_date_added_defaults_to_today():
@@ -540,19 +541,63 @@ def test_primer_scheme_application_and_scope_round_trip_via_json():
     from primaschema.schema.info import PrimerSchemeApplication, PrimerSchemeScope
 
     ps = _minimal_scheme(
-        primer_scheme_application=PrimerSchemeApplication.WASTEWATER,
-        primer_scheme_scope=PrimerSchemeScope.QPCR,
+        primer_scheme_application=[PrimerSchemeApplication.WASTEWATER],
+        primer_scheme_scope=[PrimerSchemeScope.QPCR],
     )
     restored = PrimerScheme.model_validate_json(ps.model_dump_json())
-    assert restored.primer_scheme_application == PrimerSchemeApplication.WASTEWATER
-    assert restored.primer_scheme_scope == PrimerSchemeScope.QPCR
+    assert restored.primer_scheme_application == [PrimerSchemeApplication.WASTEWATER]
+    assert restored.primer_scheme_scope == [PrimerSchemeScope.QPCR]
+
+
+def test_primer_scheme_application_and_scope_multivalued():
+    """Both fields accept more than one value."""
+    from primaschema.schema.info import PrimerSchemeApplication, PrimerSchemeScope
+
+    applications = list(PrimerSchemeApplication)[:2]
+    scopes = list(PrimerSchemeScope)[:2]
+    ps = _minimal_scheme(
+        primer_scheme_application=applications,
+        primer_scheme_scope=scopes,
+    )
+    restored = PrimerScheme.model_validate_json(ps.model_dump_json())
+    assert restored.primer_scheme_application == applications
+    assert restored.primer_scheme_scope == scopes
+
+
+def test_primer_scheme_application_and_scope_accept_legacy_scalars():
+    """A scalar value from the pre-multivalued schema still loads.
+
+    Regression test: both fields became multivalued in info.yml, and pydantic
+    won't coerce a bare string into a list, so an info.json written against
+    the single-valued schema failed to load outright. PrimerScheme widens a
+    scalar to a one-element list on the way in.
+    """
+    import json
+
+    from pydantic import ValidationError
+
+    data = json.loads(_minimal_scheme().model_dump_json())
+    data["primer_scheme_application"] = "CLINICAL"
+    data["primer_scheme_scope"] = "WHOLE-GENOME"
+    snapshot = dict(data)
+
+    ps = PrimerScheme.model_validate(data)
+    assert ps.primer_scheme_application == ["CLINICAL"]
+    assert ps.primer_scheme_scope == ["WHOLE-GENOME"]
+    assert data == snapshot, "the caller's dict must not be mutated"
+
+    # A scalar that isn't a valid enum member is still rejected.
+    with pytest.raises(ValidationError):
+        PrimerScheme.model_validate(
+            dict(snapshot, primer_scheme_application="NOT-AN-APPLICATION")
+        )
 
 
 def test_primer_scheme_application_and_scope_optional():
-    """Both fields remain optional, defaulting to None when not provided."""
+    """Both fields remain optional, defaulting to an empty list."""
     ps = _minimal_scheme()
-    assert ps.primer_scheme_application is None
-    assert ps.primer_scheme_scope is None
+    assert ps.primer_scheme_application == []
+    assert ps.primer_scheme_scope == []
 
 
 def test_cli_create_help_renders_without_crashing():

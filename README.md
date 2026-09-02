@@ -26,7 +26,7 @@ Download a scheme from the default index and validate it:
 
 ```shell
 primaschema get example-scheme/400/v1.0.0 --output ./schemes
-primaschema validate ./schemes/example-scheme/400/v1.0.0/info.json
+primaschema validate ./schemes/example-scheme/400/v1.0.0/info.json --checks core
 ```
 
 Show CLI help or version:
@@ -43,7 +43,7 @@ primaschema --show-version
 - `rebuild`: Recompute checksums, regenerate scheme README, and optionally reformat `primer.bed`.
 - `index`: Build or update an `index.json` for a local schemes directory.
 - `get`: Download schemes from an index (default is the PHA4GE primer-schemes index).
-- `modify`: Update contributors, vendors, status, license, target organisms, and algorithm fields.
+- `modify`: Update contributors, vendors, status, license, target organisms, dates and the generator.
 
 ## Scheme creation
 
@@ -53,9 +53,9 @@ primaschema create \
   --name example-scheme \
   --amplicon-size 400 \
   --version v1.0.0 \
-  --contributors "name=Alice Smith,email=alice@example.org" \
-  --target-organisms "common_name=Example organism,ncbi_tax_id=000001" \
-  --status VALIDATED \
+  --contributor "name=Alice Smith,email=alice@example.org" \
+  --target-organism "name=Example organism,ncbi_taxon_id=000001" \
+  --development-status VALIDATED \
   --bed-path ./example-scheme.primer.bed \
   --reference-path ./example-scheme.reference.fasta \
   --primer-schemes-path ./schemes
@@ -76,14 +76,25 @@ export PRIMER_SCHEMES_PATH=./schemes
 ```shell
 git clone https://github.com/pha4ge/primaschema.git
 cd primaschema
-uv sync --all-extras
+uv sync --all-extras --all-groups
 uv run primaschema --help
 uv run pytest
 uv run pre-commit install
 uv run pre-commit run --all-files
 ```
 
-`uv sync --all-extras` installs optional dependencies, including the `dev` extra (e.g. `pytest`, `pre-commit`, `ruff`) defined in `pyproject.toml`.
+`uv sync --all-extras --all-groups` installs optional dependencies, including the `dev` group (e.g. `pytest`, `pre-commit`, `ruff`) and the `docs` group (mkdocs and its plugins) defined in `pyproject.toml`. `--all-extras` alone does not install dependency groups, so omitting `--all-groups` leaves the docs unbuildable.
+
+## Documentation
+
+Documentation is built with [MkDocs](https://www.mkdocs.org):
+
+```shell
+uv run mkdocs serve   # live preview on http://127.0.0.1:8000
+uv run mkdocs build   # render to ./site
+```
+
+The CLI and schema pages are generated from the code, so they track the model automatically.
 
 The Pydantic model (`src/primaschema/schema/info.py`) is generated from the LinkML schema (`src/primaschema/schema/info.yml`). After modifying the schema, regenerate with:
 

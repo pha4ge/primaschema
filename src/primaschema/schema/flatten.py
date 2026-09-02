@@ -35,6 +35,8 @@ _SINGULAR_CLASS_GROUPS = {
 # one column with no cross-column alignment needed.
 _REPEATABLE_SCALAR_FIELDS = {
     "primer_scheme_identifier_alias",
+    "primer_scheme_application",
+    "primer_scheme_scope",
     "citation",
     "primer_scheme_details",
 }

@@ -1,3 +1,5 @@
+from typing import Any
+
 from pydantic import model_validator
 
 from primaschema.schema.info import PrimerScheme as _GeneratedPrimerScheme
@@ -45,7 +47,31 @@ def check_primer_scheme_identifier(
         )
 
 
+# primer_scheme_application and primer_scheme_scope became multivalued in
+# info.yml. Pydantic won't coerce a bare string into a list, so an info.json
+# written against the single-valued schema fails to load outright. Wrap a
+# scalar into a one-element list on the way in so older files keep working.
+_SCALAR_TO_LIST_FIELDS = (
+    "primer_scheme_application",
+    "primer_scheme_scope",
+)
+
+
 class PrimerScheme(_GeneratedPrimerScheme):
+    @model_validator(mode="before")
+    @classmethod
+    def _widen_scalars_to_lists(cls, data: Any) -> Any:
+        if isinstance(data, dict):
+            scalars = {
+                field: [data[field]]
+                for field in _SCALAR_TO_LIST_FIELDS
+                if isinstance(data.get(field), str)
+            }
+            if scalars:
+                # Don't mutate the caller's dict.
+                return {**data, **scalars}
+        return data
+
     @model_validator(mode="after")
     def _sync_primer_scheme_identifier(self):
         expected = compute_primer_scheme_identifier(

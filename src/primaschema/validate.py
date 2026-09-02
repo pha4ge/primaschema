@@ -30,6 +30,25 @@ class ValidationEngine(enum.Enum):
     LINKML = "linkml"
 
 
+class ValidationChecks(enum.Enum):
+    """How much of a scheme directory to validate.
+
+    A scheme directory acquires its files in stages: `get` downloads only
+    info.json, primer.bed and reference.fasta, while `create` and `rebuild`
+    also write a generated README.md. Validating a downloaded scheme therefore
+    needs a way to stop short of the files that were never fetched.
+    """
+
+    INFO = "info"
+    """info.json alone: the model, the path/name agreement and the identifier."""
+
+    CORE = "core"
+    """INFO plus primer.bed, reference.fasta and the recorded checksums."""
+
+    FULL = "full"
+    """CORE plus README.md and its agreement with info.json."""
+
+
 def validate_scheme_json_with_pydantic(info_path: Path) -> PrimerScheme:
     """Validate an info.json file using the Pydantic model.
 
@@ -330,6 +349,7 @@ def validate(
     additional_linkml: bool = False,
     strict: bool = False,
     fix: bool = False,
+    checks: ValidationChecks = ValidationChecks.FULL,
 ):
     """Validate a scheme directory (info.json, primer.bed, reference.fasta).
 
@@ -339,11 +359,13 @@ def validate(
         additional_linkml: If True, run LinkML validation.
         strict: If True, enforce strict primer.bed ordering.
         fix: If True, rewrite files when normalised hashes match expected.
+        checks: How much of the scheme directory to validate. See
+            ValidationChecks; defaults to FULL.
 
     Raises:
         ValueError: If any validation step fails.
     """
-    logger.debug(f"Validating {'strict' if strict else ''} {infopath}")
+    logger.debug(f"Validating {'strict' if strict else ''} {infopath} ({checks.value})")
     if additional_linkml:
         logger.debug(f"Validated with LinkML: {infopath}")
         validate_scheme_json_with_linkml(infopath)
@@ -353,6 +375,11 @@ def validate(
     validate_name(infopath, primer_scheme)
     validate_identifier(infopath, primer_scheme)
     logger.debug(f"Validated with Pydantic: {infopath}")
+
+    if checks is ValidationChecks.INFO:
+        if fix:
+            logger.warning("--fix has no effect with --checks info; nothing to rewrite")
+        return
 
     # Validate primer + ref
     try:
@@ -370,12 +397,20 @@ def validate(
 
     # Validate hashes
     validate_hashes(infopath, primer_scheme, fix=fix)
+    logger.debug(f"Validated hashes:  {infopath}")
+
+    if checks is ValidationChecks.CORE:
+        return
+
     validate_readme(infopath, primer_scheme)
-    logger.debug(f"Validated hashes and README:  {infopath}")
+    logger.debug(f"Validated README:  {infopath}")
 
 
 def validate_all(
-    primer_schemes_path: Path, additional_linkml: bool = False, strict: bool = True
+    primer_schemes_path: Path,
+    additional_linkml: bool = False,
+    strict: bool = True,
+    checks: ValidationChecks = ValidationChecks.FULL,
 ):
     """Validate all schemes under a root directory.
 
@@ -383,6 +418,7 @@ def validate_all(
         primer_schemes_path: Root path to search for info.json files.
         additional_linkml: If True, run LinkML validation.
         strict: If True, enforce strict primer.bed ordering.
+        checks: How much of each scheme directory to validate.
 
     Raises:
         ValueError: If any scheme fails validation.
@@ -391,7 +427,7 @@ def validate_all(
     errors: list[str] = []
     for schemeinfo in primer_schemes_path.rglob(f"*/{METADATA_FILE_NAME}"):
         try:
-            validate(schemeinfo, None, additional_linkml, strict)
+            validate(schemeinfo, None, additional_linkml, strict, checks=checks)
         except Exception as exc:
             logger.error(f"Validation failed for {schemeinfo}: {exc}")
             errors.append(f"{schemeinfo}: {exc}")

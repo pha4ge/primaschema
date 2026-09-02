@@ -1,0 +1,47 @@
+name: Docs
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+# Required by actions/deploy-pages. Set Pages source to "GitHub Actions" in the
+# repository settings for the deploy step to have somewhere to publish to.
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never let two publishes race, but let an in-flight one finish.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        # --all-groups is required: the docs dependencies are a dependency
+        # group, and --all-extras alone does not install groups.
+        run: uv sync --all-extras --all-groups
+      - name: Build docs
+        run: uv run mkdocs build --strict
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

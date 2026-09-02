@@ -1,7 +1,7 @@
 import pytest
 
 from primaschema.cli import (
-    parse_algorithm,
+    parse_generator,
     parse_contributor_single,
     parse_contributors_pydantic,
     parse_target_organism_single,
@@ -176,50 +176,50 @@ def test_parse_vendor_single_invalid():
 # --- PrimerSchemeGenerator Tests ---
 
 
-def test_parse_algorithm_none():
-    """parse_algorithm returns None when given None (optional field with no value)."""
-    assert parse_algorithm(None) is None
+def test_parse_generator_none():
+    """parse_generator returns None when given None (optional field with no value)."""
+    assert parse_generator(None) is None
 
 
-def test_parse_algorithm_object():
-    """parse_algorithm passes through an already-constructed PrimerSchemeGenerator unchanged."""
+def test_parse_generator_object():
+    """parse_generator passes through an already-constructed PrimerSchemeGenerator unchanged."""
     a = PrimerSchemeGenerator(
         primer_scheme_generator_name="algo", primer_scheme_generator_version="1.0"
     )
-    assert parse_algorithm(a) == a
+    assert parse_generator(a) == a
 
 
-def test_parse_algorithm_dict():
-    """parse_algorithm constructs an PrimerSchemeGenerator from a plain dict."""
+def test_parse_generator_dict():
+    """parse_generator constructs an PrimerSchemeGenerator from a plain dict."""
     data = {
         "primer_scheme_generator_name": "dict_algo",
         "primer_scheme_generator_version": "2.0",
     }
-    a = parse_algorithm(data)
+    a = parse_generator(data)
     assert a.primer_scheme_generator_name == "dict_algo"
     assert a.primer_scheme_generator_version == "2.0"
 
 
-def test_parse_algorithm_string_with_version():
-    """parse_algorithm splits 'name:version' strings into separate name and version fields."""
+def test_parse_generator_string_with_version():
+    """parse_generator splits 'name:version' strings into separate name and version fields."""
     s = "tool:1.2.3"
-    a = parse_algorithm(s)
+    a = parse_generator(s)
     assert a.primer_scheme_generator_name == "tool"
     assert a.primer_scheme_generator_version == "1.2.3"
 
 
-def test_parse_algorithm_string_name_only():
-    """parse_algorithm treats a string without ':' as the algorithm name only."""
+def test_parse_generator_string_name_only():
+    """parse_generator treats a string without ':' as the generator name only."""
     s = "tool_only"
-    a = parse_algorithm(s)
+    a = parse_generator(s)
     assert a.primer_scheme_generator_name == "tool_only"
     assert a.primer_scheme_generator_version is None
 
 
-def test_parse_algorithm_invalid():
-    """parse_algorithm raises ValueError for unsupported input types (e.g. int)."""
+def test_parse_generator_invalid():
+    """parse_generator raises ValueError for unsupported input types (e.g. int)."""
     with pytest.raises(ValueError):
-        parse_algorithm(123)
+        parse_generator(123)
 
 
 # --- PrimerSchemeTargetOrganism Tests ---
