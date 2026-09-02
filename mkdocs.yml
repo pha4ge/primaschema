@@ -5,6 +5,12 @@ theme:
 
 repo_url: https://github.com/pha4ge/primaschema
 
+# griffe_ext.py and any stray __pycache__ live inside docs/, and mkdocs copies
+# unrecognised files into the built site verbatim unless excluded.
+exclude_docs: |
+  griffe_ext.py
+  __pycache__/
+
 plugins:
   - mkdocstrings:
       default_handler: python
@@ -25,6 +31,7 @@ markdown_extensions:
   - admonition
 
 nav:
+  - Home: index.md
   - Command Line Interface: cli.md
   - Usage Examples: usage_examples.md
   - API: api.md
